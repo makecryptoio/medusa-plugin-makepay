@@ -4,7 +4,7 @@
 [![CI](https://github.com/makecryptoio/medusa-plugin-makepay/actions/workflows/ci.yml/badge.svg)](https://github.com/makecryptoio/medusa-plugin-makepay/actions/workflows/ci.yml)
 
 <p align="center">
-  <img src="./assets/makepay-medusa-icon.svg" alt="MakePay icon" width="96" height="96" />
+  <img src="./assets/makepay-medusa-icon.png" alt="MakePay icon" width="96" height="96" />
 </p>
 
 Official MakePay payment provider for Medusa v2. The provider creates hosted

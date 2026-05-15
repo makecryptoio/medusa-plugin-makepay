@@ -1,6 +1,6 @@
 {
   "name": "@makecrypto/medusa-plugin-makepay",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Official MakePay payment provider for Medusa v2 hosted checkout.",
   "license": "MIT",
   "author": "MakePay",
