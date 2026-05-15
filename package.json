@@ -1,0 +1,74 @@
+{
+  "name": "@makecrypto/medusa-plugin-makepay",
+  "version": "0.1.1",
+  "description": "Official MakePay payment provider for Medusa v2 hosted checkout.",
+  "license": "MIT",
+  "author": "MakePay",
+  "homepage": "https://github.com/makecryptoio/medusa-plugin-makepay#readme",
+  "bugs": {
+    "url": "https://github.com/makecryptoio/medusa-plugin-makepay/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./providers/makepay": {
+      "types": "./dist/providers/makepay/index.d.ts",
+      "import": "./dist/providers/makepay/index.js",
+      "default": "./dist/providers/makepay/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "assets",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/makecryptoio/medusa-plugin-makepay.git"
+  },
+  "keywords": [
+    "medusa-plugin",
+    "medusa-v2",
+    "medusa-plugin-integration",
+    "medusa-plugin-payment",
+    "makepay",
+    "makecrypto",
+    "crypto-payments",
+    "payment-provider",
+    "hosted-checkout"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "check": "npm run build && npm test && npm run pack:dry-run",
+    "prepublishOnly": "npm run check",
+    "test": "node tests/run.mjs",
+    "pack:dry-run": "npm pack --dry-run --json"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "peerDependencies": {
+    "@medusajs/framework": ">=2.3.0 <3.0.0"
+  },
+  "dependencies": {
+    "@makecrypto/makepay": "^0.3.0"
+  },
+  "devDependencies": {
+    "@medusajs/framework": "^2.15.2",
+    "typescript": "^5"
+  }
+}
