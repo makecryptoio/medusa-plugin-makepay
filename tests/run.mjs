@@ -1,19 +1,26 @@
 import assert from "node:assert/strict";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const sourceRoot = join(__dirname, "..");
-const packageRoot = join(sourceRoot, "node_modules");
 
 function writeRuntimeStub(path, source) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, source);
 }
 
-function installRuntimeStubs() {
+function installRuntimeStubs(packageRoot) {
   rmSync(packageRoot, { force: true, recursive: true });
 
   writeRuntimeStub(
@@ -178,7 +185,12 @@ function signWebhook(rawBody, secret) {
 }
 
 async function main() {
-  installRuntimeStubs();
+  const runtimeRoot = mkdtempSync(join(tmpdir(), "makepay-medusa-test-"));
+  const packageRoot = join(runtimeRoot, "node_modules");
+  const runtimeDistRoot = join(runtimeRoot, "dist");
+
+  installRuntimeStubs(packageRoot);
+  cpSync(join(sourceRoot, "dist"), runtimeDistRoot, { recursive: true });
 
   try {
     const pkg = JSON.parse(
@@ -201,7 +213,7 @@ async function main() {
     }
 
     const moduleUrl = pathToFileURL(
-      join(sourceRoot, "dist/providers/makepay/index.js"),
+      join(runtimeDistRoot, "providers/makepay/index.js"),
     );
     const makePayUrl = pathToFileURL(
       join(packageRoot, "@makecrypto/makepay/index.js"),
@@ -400,7 +412,7 @@ async function main() {
 
     console.log("MakePay Medusa provider source verified.");
   } finally {
-    rmSync(packageRoot, { force: true, recursive: true });
+    rmSync(runtimeRoot, { force: true, recursive: true });
   }
 }
 
