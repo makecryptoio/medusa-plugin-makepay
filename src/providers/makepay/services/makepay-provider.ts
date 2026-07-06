@@ -54,6 +54,7 @@ import {
   mapMakePayWebhookToPaymentAction,
   normalizeAmountValue,
   normalizeProviderOptions,
+  shouldRefreshPaymentLinkForUpdate,
   validateMakePayProviderOptions,
 } from "../utils.js";
 
@@ -119,7 +120,9 @@ class MakePayProviderService extends AbstractPaymentProvider<MakePayProviderOpti
     return {
       id: uid,
       data: buildProviderData({
+        amount: payload.amount,
         existing: data,
+        fiatCurrency: currency_code.toUpperCase(),
         paymentLink,
         sessionId,
         status: "requires_more",
@@ -179,6 +182,22 @@ class MakePayProviderService extends AbstractPaymentProvider<MakePayProviderOpti
     }
 
     const providerData = await this.retrieveProviderData(data);
+    if (
+      shouldRefreshPaymentLinkForUpdate({
+        currentData: providerData,
+        nextAmount: amount,
+        nextCurrencyCode: currency_code,
+      })
+    ) {
+      await this.archivePaymentLink(providerData);
+
+      return this.initiatePayment({
+        amount,
+        context,
+        currency_code,
+        data: providerData,
+      }) as Promise<UpdatePaymentOutput>;
+    }
 
     return {
       data: providerData,

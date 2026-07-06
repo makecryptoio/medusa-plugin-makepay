@@ -21,10 +21,15 @@ declare module "@makecrypto/makepay" {
     uid?: string;
     publicUrl?: string;
     checkoutUrl?: string;
+    public_url?: string;
+    checkout_url?: string;
     url?: string;
     status?: string;
     amount?: string | number | null;
+    amountUsd?: string | number | null;
     currency?: string | null;
+    fiatCurrency?: string | null;
+    fiat_currency?: string | null;
     metadata?: Record<string, unknown>;
     payload?: Record<string, unknown>;
     [key: string]: unknown;
@@ -33,6 +38,12 @@ declare module "@makecrypto/makepay" {
   export type MakePayPaymentLinkResponse = {
     paymentLink?: MakePayPaymentLink;
     payment_link?: MakePayPaymentLink;
+    data?: {
+      paymentLink?: MakePayPaymentLink;
+      payment_link?: MakePayPaymentLink;
+      link?: MakePayPaymentLink;
+    };
+    link?: MakePayPaymentLink;
     [key: string]: unknown;
   };
 
