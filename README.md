@@ -1,7 +1,7 @@
 # MakePay for Medusa
 
 [![npm version](https://img.shields.io/npm/v/@makecrypto/medusa-plugin-makepay.svg)](https://www.npmjs.com/package/@makecrypto/medusa-plugin-makepay)
-[![CI](https://github.com/makecryptoio/medusa-plugin-makepay/actions/workflows/ci.yml/badge.svg)](https://github.com/makecryptoio/medusa-plugin-makepay/actions/workflows/ci.yml)
+[![CI](https://github.com/makepay-io/medusa-plugin-makepay/actions/workflows/ci.yml/badge.svg)](https://github.com/makepay-io/medusa-plugin-makepay/actions/workflows/ci.yml)
 
 <p align="center">
   <img src="./assets/makepay-medusa-icon.png" alt="MakePay icon" width="96" height="96" />
@@ -10,6 +10,10 @@
 Official MakePay payment provider for Medusa v2. The provider creates hosted
 MakePay checkout links for Medusa payment sessions and reconciles payment
 status through signed MakePay webhooks.
+
+Need MakePay credentials? Register your merchant account at
+[makepay.io](https://makepay.io) before configuring this plugin. Your merchant
+account provides the API key and webhook secret used below.
 
 ## Install
 
@@ -73,6 +77,7 @@ webhook secret as `MAKEPAY_WEBHOOK_SECRET`.
 | `returnUrl` | no | Fallback return URL for MakePay checkout. |
 | `successUrl` | no | Success return URL for MakePay checkout. |
 | `failureUrl` | no | Failure return URL for MakePay checkout. |
+| `webhookToleranceSeconds` | no | Signature timestamp tolerance for MakePay webhooks. |
 
 ## Storefront flow
 
@@ -85,6 +90,10 @@ paymentSession.data.next_action
 
 Redirect shoppers to that URL, then use MakePay webhooks to update the Medusa
 payment session when the payment is completed, canceled, or failed.
+
+If Medusa updates an unpaid payment session because the cart amount or fiat
+currency changed, the provider archives the old MakePay link and creates a new
+hosted checkout link for the updated session.
 
 ## Development
 

@@ -76,6 +76,18 @@ const WEBHOOK_CANCELED_EVENTS = new Set([
   "payment_cancelled_by_payer",
 ]);
 
+const WEBHOOK_RECORD_KEYS = [
+  "data",
+  "payload",
+  "event",
+  "session",
+  "latestSession",
+  "payment",
+  "paymentLink",
+  "payment_link",
+  "link",
+] as const;
+
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -155,16 +167,24 @@ export function getNestedRecord(
 export function getPaymentLinkFromResponse(
   response: MakePayPaymentLinkResponse | Record<string, unknown>,
 ): MakePayPaymentLink {
-  if (isRecord(response.paymentLink)) {
-    return response.paymentLink as MakePayPaymentLink;
-  }
+  const data = getNestedRecord(response, "data");
 
-  if (isRecord(response.payment_link)) {
-    return response.payment_link as MakePayPaymentLink;
-  }
+  for (const source of [response, data]) {
+    if (!source) {
+      continue;
+    }
 
-  if (isRecord(response.link)) {
-    return response.link as MakePayPaymentLink;
+    if (isRecord(source.paymentLink)) {
+      return source.paymentLink as MakePayPaymentLink;
+    }
+
+    if (isRecord(source.payment_link)) {
+      return source.payment_link as MakePayPaymentLink;
+    }
+
+    if (isRecord(source.link)) {
+      return source.link as MakePayPaymentLink;
+    }
   }
 
   return {};
@@ -175,12 +195,16 @@ export function getPaymentLinkUid(data: unknown): string | undefined {
     return undefined;
   }
 
-  const link = getNestedRecord(data, "paymentLink");
+  const link =
+    getNestedRecord(data, "paymentLink") ??
+    getNestedRecord(data, "payment_link") ??
+    getNestedRecord(data, "link");
 
   return (
     getText(data.payment_link_uid) ??
     getText(data.paymentLinkUid) ??
     getText(data.payment_link_id) ??
+    getText(data.uid) ??
     getText(data.id) ??
     getText(link?.uid) ??
     getText(link?.id)
@@ -191,7 +215,47 @@ export function getPaymentLinkUrl(link: MakePayPaymentLink): string | undefined 
   return (
     getText(link.publicUrl) ??
     getText(link.checkoutUrl) ??
+    getText(link.public_url) ??
+    getText(link.checkout_url) ??
     getText(link.url)
+  );
+}
+
+export function getPaymentLinkAmount(
+  data: unknown,
+): string | number | undefined {
+  if (!isRecord(data)) {
+    return undefined;
+  }
+
+  const link =
+    getNestedRecord(data, "paymentLink") ??
+    getNestedRecord(data, "payment_link") ??
+    getNestedRecord(data, "link");
+
+  return (
+    getNumberOrText(data.amount) ??
+    getNumberOrText(data.payment_amount) ??
+    getNumberOrText(link?.amount) ??
+    getNumberOrText(link?.amountUsd)
+  );
+}
+
+export function getPaymentLinkFiatCurrency(data: unknown): string | undefined {
+  if (!isRecord(data)) {
+    return undefined;
+  }
+
+  const link =
+    getNestedRecord(data, "paymentLink") ??
+    getNestedRecord(data, "payment_link") ??
+    getNestedRecord(data, "link");
+
+  return (
+    getText(data.fiat_currency) ??
+    getText(data.fiatCurrency) ??
+    getText(link?.fiatCurrency) ??
+    getText(link?.fiat_currency)
   );
 }
 
@@ -211,73 +275,42 @@ export function getSessionIdFromData(data: unknown): string | undefined {
 }
 
 export function getSessionIdFromWebhook(event: unknown): string | undefined {
-  if (!isRecord(event)) {
-    return undefined;
+  for (const record of collectWebhookRecords(event, { includeMetadata: true })) {
+    const sessionId =
+      getText(record.session_id) ??
+      getText(record.sessionId) ??
+      getText(record.medusaSessionId);
+
+    if (sessionId) {
+      return sessionId;
+    }
   }
 
-  const paymentLink = getNestedRecord(event, "paymentLink");
-  const payment = getNestedRecord(event, "payment");
-  const data = getNestedRecord(event, "data");
-  const linkPayload = paymentLink ? getNestedRecord(paymentLink, "payload") : undefined;
-  const linkMetadata = paymentLink ? getNestedRecord(paymentLink, "metadata") : undefined;
-  const payloadMetadata = linkPayload
-    ? getNestedRecord(linkPayload, "metadata")
-    : undefined;
-  const paymentMetadata = payment ? getNestedRecord(payment, "metadata") : undefined;
-
-  return (
-    getText(data?.session_id) ??
-    getText(data?.medusaSessionId) ??
-    getText(linkMetadata?.session_id) ??
-    getText(linkMetadata?.medusaSessionId) ??
-    getText(payloadMetadata?.session_id) ??
-    getText(payloadMetadata?.medusaSessionId) ??
-    getText(paymentMetadata?.session_id) ??
-    getText(paymentMetadata?.medusaSessionId)
-  );
+  return undefined;
 }
 
 export function getAmountFromWebhook(event: unknown): string | number | undefined {
-  if (!isRecord(event)) {
-    return undefined;
+  for (const record of collectWebhookRecords(event)) {
+    const amount =
+      getNumberOrText(record.invoiceAmount) ??
+      getNumberOrText(record.expectedBuyAmount) ??
+      getNumberOrText(record.fiatAmount) ??
+      getNumberOrText(record.amount) ??
+      getNumberOrText(record.amountUsd) ??
+      getNumberOrText(record.totalAmount);
+
+    if (amount !== undefined) {
+      return amount;
+    }
   }
 
-  const session = getNestedRecord(event, "session");
-  const paymentLink = getNestedRecord(event, "paymentLink");
-  const payment = getNestedRecord(event, "payment");
-  const data = getNestedRecord(event, "data");
-
-  return (
-    getNumberOrText(session?.invoiceAmount) ??
-    getNumberOrText(session?.expectedBuyAmount) ??
-    getNumberOrText(payment?.amount) ??
-    getNumberOrText(payment?.fiatAmount) ??
-    getNumberOrText(paymentLink?.amount) ??
-    getNumberOrText(data?.amount)
-  );
+  return undefined;
 }
 
 export function collectStatusValues(input: unknown): string[] {
-  if (!isRecord(input)) {
-    return [];
-  }
-
   const values: string[] = [];
-  const nestedKeys = ["paymentLink", "payment", "session", "data"];
 
-  for (const key of ["status", "paymentStatus", "state", "type"]) {
-    const value = getText(input[key]);
-    if (value) {
-      values.push(value.toLowerCase());
-    }
-  }
-
-  for (const key of nestedKeys) {
-    const record = getNestedRecord(input, key);
-    if (!record) {
-      continue;
-    }
-
+  for (const record of collectWebhookRecords(input)) {
     for (const statusKey of ["status", "paymentStatus", "state", "type"]) {
       const value = getText(record[statusKey]);
       if (value) {
@@ -286,13 +319,46 @@ export function collectStatusValues(input: unknown): string[] {
     }
   }
 
-  const event = getNestedRecord(input, "event");
-  const eventType = getText(event?.type);
-  if (eventType) {
-    values.push(eventType.toLowerCase());
+  return values;
+}
+
+export function collectWebhookRecords(
+  input: unknown,
+  options: { includeMetadata?: boolean } = {},
+): Record<string, unknown>[] {
+  if (!isRecord(input)) {
+    return [];
   }
 
-  return values;
+  const records: Record<string, unknown>[] = [];
+  const seen = new Set<Record<string, unknown>>();
+  const keys = options.includeMetadata
+    ? [...WEBHOOK_RECORD_KEYS, "metadata"]
+    : WEBHOOK_RECORD_KEYS;
+
+  const visit = (record: Record<string, unknown>, depth: number): void => {
+    if (seen.has(record)) {
+      return;
+    }
+
+    seen.add(record);
+    records.push(record);
+
+    if (depth <= 0) {
+      return;
+    }
+
+    for (const key of keys) {
+      const nested = getNestedRecord(record, key);
+      if (nested) {
+        visit(nested, depth - 1);
+      }
+    }
+  };
+
+  visit(input, 4);
+
+  return records;
 }
 
 export function mapMakePayStateToPaymentSessionStatus(
@@ -364,20 +430,87 @@ export function mapMakePayWebhookToPaymentAction(
   return "not_supported";
 }
 
+export function shouldRefreshPaymentLinkForUpdate(input: {
+  currentData: unknown;
+  nextAmount: BigNumberInput;
+  nextCurrencyCode: string;
+}): boolean {
+  const status = mapMakePayStateToPaymentSessionStatus(input.currentData);
+
+  if (status === "captured" || status === "authorized") {
+    return false;
+  }
+
+  if (status === "canceled" || status === "error") {
+    return true;
+  }
+
+  const currentAmount = getPaymentLinkAmount(input.currentData);
+  const currentCurrency = getPaymentLinkFiatCurrency(input.currentData);
+
+  if (
+    currentAmount !== undefined &&
+    !arePaymentAmountsEqual(currentAmount, normalizeAmountValue(input.nextAmount))
+  ) {
+    return true;
+  }
+
+  return (
+    currentCurrency !== undefined &&
+    currentCurrency.toUpperCase() !== input.nextCurrencyCode.toUpperCase()
+  );
+}
+
+export function arePaymentAmountsEqual(
+  left: string | number,
+  right: string | number,
+): boolean {
+  const leftText = String(left).trim();
+  const rightText = String(right).trim();
+
+  if (leftText === rightText) {
+    return true;
+  }
+
+  const leftNumber = Number(leftText);
+  const rightNumber = Number(rightText);
+
+  return (
+    Number.isFinite(leftNumber) &&
+    Number.isFinite(rightNumber) &&
+    leftNumber === rightNumber
+  );
+}
+
 export function buildProviderData(input: {
   existing?: Record<string, unknown>;
   paymentLink: MakePayPaymentLink;
   sessionId?: string;
   status?: MakePayPaymentSessionStatus;
+  amount?: string | number;
+  fiatCurrency?: string;
 }): MakePayProviderData {
   const uid = getText(input.paymentLink.uid) ?? getText(input.paymentLink.id);
   const url = getPaymentLinkUrl(input.paymentLink);
   const status =
     input.status ?? mapMakePayStateToPaymentSessionStatus(input.paymentLink);
+  const amount =
+    input.amount ??
+    getNumberOrText(input.paymentLink.amount) ??
+    getNumberOrText(input.existing?.amount);
+  const fiatCurrency =
+    input.fiatCurrency ??
+    getText(input.paymentLink.fiatCurrency) ??
+    getText(input.paymentLink.fiat_currency) ??
+    getText(input.existing?.fiat_currency) ??
+    getText(input.existing?.fiatCurrency);
 
   return {
     ...(input.existing ?? {}),
     id: uid,
+    amount,
+    fiat_currency: fiatCurrency,
+    fiatCurrency,
     payment_link_uid: uid,
     paymentLinkUid: uid,
     public_url: url,

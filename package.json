@@ -1,12 +1,12 @@
 {
   "name": "@makecrypto/medusa-plugin-makepay",
-  "version": "0.1.2",
-  "description": "Official MakePay payment provider for Medusa v2 hosted checkout.",
+  "version": "0.2.0",
+  "description": "Official MakePay payment provider for Medusa v2 hosted checkout. Register a merchant account at https://makepay.io.",
   "license": "MIT",
   "author": "MakePay",
-  "homepage": "https://github.com/makecryptoio/medusa-plugin-makepay#readme",
+  "homepage": "https://makepay.io",
   "bugs": {
-    "url": "https://github.com/makecryptoio/medusa-plugin-makepay/issues"
+    "url": "https://github.com/makepay-io/medusa-plugin-makepay/issues"
   },
   "type": "module",
   "sideEffects": false,
@@ -37,7 +37,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/makecryptoio/medusa-plugin-makepay.git"
+    "url": "git+https://github.com/makepay-io/medusa-plugin-makepay.git"
   },
   "keywords": [
     "medusa-plugin",

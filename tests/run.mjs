@@ -88,6 +88,7 @@ export function ModuleProvider(moduleName, config) {
 import { createHmac, timingSafeEqual } from "node:crypto"
 
 export const makePayClientCalls = []
+let makePayPaymentLinkCounter = 0
 
 export class MakePayClient {
   constructor(options) {
@@ -97,6 +98,8 @@ export class MakePayClient {
 
   async createPaymentLink(payload, options = {}) {
     makePayClientCalls.push({ type: "createPaymentLink", payload, options, clientOptions: this.options })
+    const uid = makePayPaymentLinkCounter === 0 ? "pay_123" : "pay_" + String(123 + makePayPaymentLinkCounter)
+    makePayPaymentLinkCounter += 1
 
     if (this.options.fetch) {
       await this.options.fetch(new Request(
@@ -120,10 +123,11 @@ export class MakePayClient {
 
     return {
       paymentLink: {
-        uid: "pay_123",
-        publicUrl: "https://makepay.io/payment/pay_123",
+        uid,
+        publicUrl: "https://makepay.io/payment/" + uid,
         status: "active",
         amount: payload.amount,
+        fiatCurrency: payload.fiatCurrency,
         metadata: payload.metadata,
       },
     }
@@ -342,6 +346,35 @@ async function main() {
       assert.equal(status.status, expected);
     }
 
+    globalThis.__makepayGetPaymentLinkResponse = undefined;
+    const updated = await provider.updatePayment({
+      amount: "19.99",
+      context: {
+        customer: {
+          email: "buyer@example.com",
+          id: "cus_123",
+        },
+        idempotency_key: "idem_456",
+      },
+      currency_code: "usd",
+      data: initiated.data,
+    });
+    assert.equal(updated.data.payment_link_uid, "pay_124");
+    assert.equal(updated.data.amount, "19.99");
+    assert.equal(updated.data.fiat_currency, "USD");
+    assert.deepEqual(updated.data.next_action, {
+      type: "redirect",
+      url: "https://makepay.io/payment/pay_124",
+    });
+    assert.ok(
+      makePayClientCalls.some(
+        (call) =>
+          call.type === "updatePaymentLink" &&
+          call.uid === "pay_123" &&
+          call.updates.status === "archived",
+      ),
+    );
+
     const archived = await provider.cancelPayment({
       data: {
         payment_link_uid: "pay_cancel",
@@ -397,6 +430,33 @@ async function main() {
     assert.equal(webhook.action, "captured");
     assert.equal(webhook.data.session_id, "ps_123");
     assert.equal(webhook.data.amount, "12.34");
+
+    const nestedRawWebhook = JSON.stringify({
+      data: {
+        paymentLink: {
+          amount: "20.00",
+          metadata: {
+            session_id: "ps_nested",
+          },
+          uid: "pay_nested",
+        },
+        session: {
+          invoiceAmount: "20.00",
+          status: "complete",
+        },
+      },
+      type: "makepay.payment.status_changed",
+    });
+    const nestedWebhook = await provider.getWebhookActionAndData({
+      data: JSON.parse(nestedRawWebhook),
+      headers: {
+        "x-makepay-signature": signWebhook(nestedRawWebhook, "whsec"),
+      },
+      rawData: nestedRawWebhook,
+    });
+    assert.equal(nestedWebhook.action, "captured");
+    assert.equal(nestedWebhook.data.session_id, "ps_nested");
+    assert.equal(nestedWebhook.data.amount, "20.00");
 
     await assert.rejects(
       () =>

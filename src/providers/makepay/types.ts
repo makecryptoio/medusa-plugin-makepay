@@ -41,6 +41,9 @@ export type NormalizedMakePayProviderOptions = Required<
 
 export type MakePayProviderData = Record<string, unknown> & {
   id?: string;
+  amount?: string | number;
+  fiat_currency?: string;
+  fiatCurrency?: string;
   payment_link_uid?: string;
   public_url?: string;
   checkout_url?: string;
