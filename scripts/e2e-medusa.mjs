@@ -45,6 +45,22 @@ import {
 import { patchOfficialStorefront } from "../tests/e2e/support/patch-storefront.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const officialMedusaFixtureRoot = join(
+  packageRoot,
+  "tests/fixtures/medusa-storefront-2.17.2",
+);
+const officialMedusaFixture = Object.freeze({
+  commit: "9233262ff1f04185646f88362918c027e1431cd6",
+  createMedusaAppIntegrity:
+    "sha512-+03OPgtswORKGrtjYJyUQEvFEJqfdyNbDDl/SccPDrv1FqwAA0ASKchWW0aJ1FT42U+xMSpTIeDNSdvwOTWhdg==",
+  createMedusaAppShasum: "ec69a9794da4b39544f634b346d2e545738d47c9",
+  createMedusaAppVersion: "2.17.2",
+  packageLockSha256:
+    "8bf5e2e52f85afe5a60166b27cc6740a52e87983e7bcd91fe4af4e3c2fba4e82",
+  repository: "https://github.com/medusajs/dtc-starter.git",
+  schemaVersion: 1,
+  tree: "27dec6fba7107e0a57b238e3f1bc5f3c939ec1d4",
+});
 const argv = new Set(process.argv.slice(2));
 const realSandbox = argv.has("--real-sandbox");
 const keep = argv.has("--keep");
@@ -2449,7 +2465,347 @@ function officialGeneratorNpmEnvironment() {
   };
 }
 
-async function scaffoldProject(root, databaseUrl) {
+function normalizeOfficialFixtureManifest(manifest) {
+  const normalized = structuredClone(manifest);
+  delete normalized.packageManager;
+  return normalized;
+}
+
+async function readPinnedOfficialMedusaFixture() {
+  const paths = {
+    backend: join(officialMedusaFixtureRoot, "apps/backend/package.json"),
+    lock: join(officialMedusaFixtureRoot, "package-lock.json"),
+    root: join(officialMedusaFixtureRoot, "package.json"),
+    source: join(officialMedusaFixtureRoot, "source.json"),
+    storefront: join(
+      officialMedusaFixtureRoot,
+      "apps/storefront/package.json",
+    ),
+  };
+  const entries = await Promise.all(
+    Object.entries(paths).map(async ([label, path]) => {
+      const entry = await lstat(path);
+      if (entry.isSymbolicLink() || !entry.isFile()) {
+        throw new Error(
+          `The pinned official Medusa ${label} fixture must be a regular file.`,
+        );
+      }
+      assertOwner(entry, `The pinned official Medusa ${label} fixture`);
+      return [label, entry];
+    }),
+  );
+  const lockEntry = Object.fromEntries(entries).lock;
+  if (lockEntry.size <= 0 || lockEntry.size > 2 * 1024 * 1024) {
+    throw new Error(
+      "The pinned official Medusa package lock exceeds its reviewed size bound.",
+    );
+  }
+  const [backend, lockBytes, root, source, storefront] = await Promise.all([
+    readFile(paths.backend, "utf8").then(JSON.parse),
+    readFile(paths.lock),
+    readFile(paths.root, "utf8").then(JSON.parse),
+    readFile(paths.source, "utf8").then(JSON.parse),
+    readFile(paths.storefront, "utf8").then(JSON.parse),
+  ]);
+  assert.deepEqual(source, officialMedusaFixture);
+  if (
+    sha256Bytes(lockBytes) !== officialMedusaFixture.packageLockSha256
+  ) {
+    throw new Error(
+      "The pinned official Medusa package lock changed without a reviewed source update.",
+    );
+  }
+  const lockText = lockBytes.toString("utf8");
+  if (
+    /(?:^|["/])(?:makecrypto|makepay)(?:["/]|$)|\bfile:|\/Users\//i.test(
+      lockText,
+    )
+  ) {
+    throw new Error(
+      "The pinned official Medusa package lock contains a local or MakePay dependency.",
+    );
+  }
+  const lock = JSON.parse(lockText);
+  if (
+    lock.name !== "medusa-app" ||
+    lock.lockfileVersion !== 3 ||
+    lock.packages?.[""]?.name !== "medusa-app" ||
+    lock.packages?.["apps/backend"]?.dependencies?.[
+      "@medusajs/medusa"
+    ] !== "2.17.2" ||
+    lock.packages?.["apps/storefront"]?.dependencies?.[
+      "@medusajs/js-sdk"
+    ] !== "2.17.2" ||
+    lock.packages?.["apps/storefront"]?.devDependencies?.[
+      "@medusajs/types"
+    ] !== "2.17.2"
+  ) {
+    throw new Error(
+      "The pinned official Medusa package lock is not the reviewed 2.17.2 storefront fixture.",
+    );
+  }
+  const expectedWorkspaceLinks = new Map([
+    ["node_modules/@dtc/backend", "apps/backend"],
+    ["node_modules/@dtc/storefront", "apps/storefront"],
+  ]);
+  const workspaceManifests = new Set([
+    "",
+    "apps/backend",
+    "apps/storefront",
+  ]);
+  let externalPackageCount = 0;
+  for (const [packagePath, entry] of Object.entries(lock.packages || {})) {
+    if (entry?.link === true) {
+      if (expectedWorkspaceLinks.get(packagePath) !== entry.resolved) {
+        throw new Error(
+          "The pinned official Medusa package lock contains an unexpected workspace link.",
+        );
+      }
+      expectedWorkspaceLinks.delete(packagePath);
+      continue;
+    }
+    if (workspaceManifests.has(packagePath)) {
+      if (entry?.resolved !== undefined || entry?.integrity !== undefined) {
+        throw new Error(
+          "The pinned official Medusa workspace manifest cannot resolve to an external artifact.",
+        );
+      }
+      continue;
+    }
+    if (
+      typeof entry?.resolved !== "string" ||
+      !entry.resolved.startsWith("https://registry.npmjs.org/") ||
+      typeof entry?.integrity !== "string" ||
+      !entry.integrity.startsWith("sha512-")
+    ) {
+      throw new Error(
+        "Every pinned official Medusa dependency must use an integrity-bound npm registry artifact.",
+      );
+    }
+    externalPackageCount += 1;
+  }
+  if (
+    expectedWorkspaceLinks.size !== 0 ||
+    externalPackageCount !== 1_993
+  ) {
+    throw new Error(
+      "The pinned official Medusa package graph changed from its reviewed fixture.",
+    );
+  }
+  validateMedusaFixtureManifests({ backend, root, storefront });
+  return {
+    lockPath: paths.lock,
+    manifests: { backend, root, storefront },
+  };
+}
+
+async function preparePinnedOfficialStarterRepository(root) {
+  const repository = join(root, "official-dtc-starter.git");
+  await run("git", ["init", "--bare", repository], { cwd: root });
+  await run(
+    "git",
+    [
+      "-C",
+      repository,
+      "fetch",
+      "--depth",
+      "1",
+      "--no-tags",
+      officialMedusaFixture.repository,
+      `${officialMedusaFixture.commit}:refs/heads/main`,
+    ],
+    {
+      cwd: root,
+      env: { GIT_TERMINAL_PROMPT: "0" },
+    },
+  );
+  const [{ stdout: commit }, { stdout: tree }] = await Promise.all([
+    run("git", ["-C", repository, "rev-parse", "refs/heads/main"], {
+      capture: true,
+      cwd: root,
+    }),
+    run(
+      "git",
+      ["-C", repository, "rev-parse", "refs/heads/main^{tree}"],
+      {
+        capture: true,
+        cwd: root,
+      },
+    ),
+  ]);
+  if (
+    commit.trim() !== officialMedusaFixture.commit ||
+    tree.trim() !== officialMedusaFixture.tree
+  ) {
+    throw new Error(
+      "The official Medusa starter checkout does not match its pinned commit and tree.",
+    );
+  }
+  await run("git", ["-C", repository, "fsck", "--strict", "--no-progress"], {
+    cwd: root,
+  });
+  return repository;
+}
+
+const createMedusaNpmShimSource = `#!/usr/bin/env node
+import { appendFileSync, realpathSync } from "node:fs";
+
+const args = process.argv.slice(2);
+if (
+  args.length === 1 &&
+  (args[0] === "--version" || args[0] === "-v")
+) {
+  const version = process.env.MAKEPAY_CMA_NPM_VERSION;
+  if (!/^\\d+\\.\\d+\\.\\d+$/.test(version || "")) process.exit(64);
+  process.stdout.write(version + "\\n");
+  process.exit(0);
+}
+
+const expectedRoot = process.env.MAKEPAY_CMA_EXPECTED_PROJECT_ROOT;
+const receiptPath = process.env.MAKEPAY_CMA_NPM_RECEIPT;
+if (!expectedRoot || !receiptPath) process.exit(64);
+if (realpathSync(process.cwd()) !== realpathSync(expectedRoot)) process.exit(65);
+
+const command = args.join(" ");
+if (command !== "install --legacy-peer-deps" && command !== "ci") {
+  process.exit(66);
+}
+appendFileSync(receiptPath, JSON.stringify({ command }) + "\\n", {
+  encoding: "utf8",
+  flag: "a",
+  mode: 0o600,
+});
+`;
+
+function validateCreateMedusaNpmReceipt(source) {
+  const rows = source
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((row) => JSON.parse(row));
+  assert.deepEqual(rows, [
+    { command: "install --legacy-peer-deps" },
+    { command: "ci" },
+  ]);
+  return true;
+}
+
+async function validateCreateMedusaNpmShimExecution() {
+  const root = await mkdtemp(
+    join(tmpdir(), "makepay-cma-npm-shim-self-test-"),
+  );
+  try {
+    const projectRoot = join(root, "medusa-app");
+    const receiptPath = join(root, "receipt.jsonl");
+    const shimPath = join(root, "npm");
+    await mkdir(projectRoot, { mode: 0o700 });
+    await writeFile(shimPath, createMedusaNpmShimSource, {
+      flag: "wx",
+      mode: 0o700,
+    });
+    await chmod(shimPath, 0o700);
+    const env = {
+      MAKEPAY_CMA_EXPECTED_PROJECT_ROOT: projectRoot,
+      MAKEPAY_CMA_NPM_RECEIPT: receiptPath,
+      MAKEPAY_CMA_NPM_VERSION: "11.6.2",
+      PATH: `${dirname(process.execPath)}:/usr/bin:/bin`,
+    };
+    for (const versionArgument of ["--version", "-v"]) {
+      const version = spawnSync(shimPath, [versionArgument], {
+        cwd: root,
+        encoding: "utf8",
+        env,
+      });
+      assert.equal(version.status, 0);
+      assert.equal(version.stdout, "11.6.2\n");
+      assert.equal(version.stderr, "");
+    }
+    for (const args of [["install", "--legacy-peer-deps"], ["ci"]]) {
+      const result = spawnSync(shimPath, args, {
+        cwd: projectRoot,
+        encoding: "utf8",
+        env,
+      });
+      assert.equal(result.status, 0);
+      assert.equal(result.stdout, "");
+      assert.equal(result.stderr, "");
+    }
+    validateCreateMedusaNpmReceipt(await readFile(receiptPath, "utf8"));
+    const unsupported = spawnSync(shimPath, ["view", "medusa"], {
+      cwd: projectRoot,
+      encoding: "utf8",
+      env,
+    });
+    assert.equal(unsupported.status, 66);
+    const wrongDirectory = spawnSync(shimPath, ["ci"], {
+      cwd: root,
+      encoding: "utf8",
+      env,
+    });
+    assert.equal(wrongDirectory.status, 65);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+}
+
+async function prepareCreateMedusaNpmShim(root, projectRoot) {
+  const shimDirectory = join(root, "create-medusa-npm-shim");
+  const shimPath = join(shimDirectory, "npm");
+  const receiptPath = join(root, "create-medusa-npm-receipt.jsonl");
+  await mkdir(shimDirectory, { mode: 0o700 });
+  await writeFile(shimPath, createMedusaNpmShimSource, {
+    flag: "wx",
+    mode: 0o700,
+  });
+  await chmod(shimPath, 0o700);
+  const { stdout } = await run("npm", ["--version"], {
+    capture: true,
+    cwd: root,
+  });
+  const npmVersion = stdout.trim();
+  if (!/^\d+\.\d+\.\d+$/.test(npmVersion)) {
+    throw new Error(
+      "The official Medusa generator requires a semantic npm version.",
+    );
+  }
+  registerRuntimeSecret(receiptPath);
+  return {
+    env: {
+      MAKEPAY_CMA_EXPECTED_PROJECT_ROOT: projectRoot,
+      MAKEPAY_CMA_NPM_RECEIPT: receiptPath,
+      MAKEPAY_CMA_NPM_VERSION: npmVersion,
+      PATH: `${shimDirectory}:${process.env.PATH || ""}`,
+    },
+    receiptPath,
+    shimDirectory,
+  };
+}
+
+async function assertGeneratedOfficialFixture(projectRoot, expected) {
+  const [backend, root, storefront] = await Promise.all([
+    readFile(join(projectRoot, "apps/backend/package.json"), "utf8").then(
+      JSON.parse,
+    ),
+    readFile(join(projectRoot, "package.json"), "utf8").then(JSON.parse),
+    readFile(
+      join(projectRoot, "apps/storefront/package.json"),
+      "utf8",
+    ).then(JSON.parse),
+  ]);
+  validateMedusaFixtureManifests({ backend, root, storefront });
+  for (const [label, actual, fixture] of [
+    ["root", root, expected.root],
+    ["backend", backend, expected.backend],
+    ["storefront", storefront, expected.storefront],
+  ]) {
+    assert.deepEqual(
+      normalizeOfficialFixtureManifest(actual),
+      normalizeOfficialFixtureManifest(fixture),
+      `The generated official Medusa ${label} manifest changed from its reviewed fixture.`,
+    );
+  }
+}
+
+async function scaffoldProject(root) {
   const existing = process.env.MAKEPAY_E2E_PROJECT_ROOT;
   if (existing) {
     const projectRoot = await validateReusableProjectRoot(existing);
@@ -2458,6 +2814,14 @@ async function scaffoldProject(root, databaseUrl) {
   }
   const projectName = "medusa-app";
   generatedProjectRoot = join(root, projectName);
+  const [fixture, repository] = await Promise.all([
+    readPinnedOfficialMedusaFixture(),
+    preparePinnedOfficialStarterRepository(root),
+  ]);
+  const npmShim = await prepareCreateMedusaNpmShim(
+    root,
+    generatedProjectRoot,
+  );
   await run(
     "npx",
     [
@@ -2466,9 +2830,9 @@ async function scaffoldProject(root, databaseUrl) {
       projectName,
       "--directory-path",
       root,
-      "--db-url",
-      databaseUrl,
-      "--seed",
+      "--repo-url",
+      repository,
+      "--skip-db",
       "--with-nextjs-starter",
       "--no-browser",
       "--use-npm",
@@ -2477,16 +2841,54 @@ async function scaffoldProject(root, databaseUrl) {
     ],
     {
       cwd: root,
-      env: officialGeneratorNpmEnvironment(),
+      env: {
+        ...officialGeneratorNpmEnvironment(),
+        ...npmShim.env,
+      },
     },
   );
-  const projectRoot = await realpath(join(root, projectName));
+  const generatedRootPath = join(root, projectName);
+  const [canonicalTemporaryRoot, generatedRootEntry, projectRoot] =
+    await Promise.all([
+      realpath(root),
+      lstat(generatedRootPath),
+      realpath(generatedRootPath),
+    ]);
+  if (
+    generatedRootEntry.isSymbolicLink() ||
+    !generatedRootEntry.isDirectory() ||
+    !pathIsStrictlyInside(canonicalTemporaryRoot, projectRoot)
+  ) {
+    throw new Error(
+      "The official Medusa generator created an unsafe project root.",
+    );
+  }
+  validateCreateMedusaNpmReceipt(
+    await readFile(npmShim.receiptPath, "utf8"),
+  );
+  await assertGeneratedOfficialFixture(projectRoot, fixture.manifests);
   await Promise.all([
     rm(join(projectRoot, "apps/backend/.env"), { force: true }),
     rm(join(projectRoot, "apps/storefront/.env.local"), { force: true }),
+    rm(npmShim.receiptPath, { force: true }),
+    rm(npmShim.shimDirectory, { force: true, recursive: true }),
   ]);
   await removeKnownGeneratedProjectNpmrc(projectRoot);
   await assertNoProjectNpmrc(projectRoot, "The generated Medusa fixture");
+  await copyFile(fixture.lockPath, join(projectRoot, "package-lock.json"));
+  await run(
+    "npm",
+    [
+      "ci",
+      "--legacy-peer-deps",
+      "--no-audit",
+      "--no-fund",
+    ],
+    {
+      cwd: projectRoot,
+      env: officialGeneratorNpmEnvironment(),
+    },
+  );
   await writeProjectOwnershipMarker(projectRoot);
   return validateReusableProjectRoot(projectRoot);
 }
@@ -4848,6 +5250,27 @@ async function runSignalWorkerMatrix(root) {
 
 async function runSanitizerSelfTest() {
   assert.match(runId, /^medusa-e2e-.+-[a-f0-9]{16}$/);
+  const pinnedOfficialFixture =
+    await readPinnedOfficialMedusaFixture();
+  assert.equal(
+    pinnedOfficialFixture.lockPath,
+    join(officialMedusaFixtureRoot, "package-lock.json"),
+  );
+  assert.equal(
+    validateCreateMedusaNpmReceipt(
+      '{"command":"install --legacy-peer-deps"}\n{"command":"ci"}\n',
+    ),
+    true,
+  );
+  for (const invalidReceipt of [
+    "",
+    '{"command":"install"}\n{"command":"ci"}\n',
+    '{"command":"install --legacy-peer-deps"}\n',
+    '{"command":"install --legacy-peer-deps"}\n{"command":"ci"}\n{"command":"ci"}\n',
+  ]) {
+    assert.throws(() => validateCreateMedusaNpmReceipt(invalidReceipt));
+  }
+  await validateCreateMedusaNpmShimExecution();
   assert.deepEqual(officialGeneratorNpmEnvironment(), {
     NPM_CONFIG_AUDIT: "false",
     NPM_CONFIG_FETCH_RETRIES: "6",
@@ -6207,10 +6630,7 @@ async function main() {
     }
   }
   const pluginArtifact = await packPlugin(temporaryRoot);
-  const projectRoot = await scaffoldProject(
-    temporaryRoot,
-    postgres.databaseUrl,
-  );
+  const projectRoot = await scaffoldProject(temporaryRoot);
   activeProjectRoot = projectRoot;
   activeProjectOwned = true;
   const artifactProvenance = await installAndPatch(projectRoot, pluginArtifact);
