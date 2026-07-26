@@ -350,9 +350,9 @@ function parentHarnessRunAccepted({
   );
 }
 
-function commandExists(command) {
+function commandExists(command, versionArguments = ["--version"]) {
   return (
-    spawnSync(command, ["--version"], {
+    spawnSync(command, versionArguments, {
       env: childEnvironment(),
       stdio: "ignore",
     }).status === 0
@@ -1996,7 +1996,7 @@ async function verifyInstalledTarball({
 }
 
 async function createLocalTlsCertificate(root) {
-  if (!commandExists("openssl")) {
+  if (!commandExists("openssl", ["version"])) {
     throw new Error(
       "OpenSSL is required to create the loopback HTTPS OAuth fixture",
     );
@@ -2742,6 +2742,26 @@ async function validateCreateMedusaNpmShimExecution() {
       env,
     });
     assert.equal(wrongDirectory.status, 65);
+  } finally {
+    await rm(root, { force: true, recursive: true });
+  }
+}
+
+async function validateCommandProbeExecution() {
+  if (process.platform === "win32") return;
+  const root = await mkdtemp(
+    join(tmpdir(), "makepay-command-probe-self-test-"),
+  );
+  try {
+    const probePath = join(root, "version-probe");
+    await writeFile(
+      probePath,
+      '#!/bin/sh\n[ "$#" -eq 1 ] && [ "$1" = "version" ]\n',
+      { flag: "wx", mode: 0o700 },
+    );
+    await chmod(probePath, 0o700);
+    assert.equal(commandExists(probePath), false);
+    assert.equal(commandExists(probePath, ["version"]), true);
   } finally {
     await rm(root, { force: true, recursive: true });
   }
@@ -5271,6 +5291,7 @@ async function runSanitizerSelfTest() {
     assert.throws(() => validateCreateMedusaNpmReceipt(invalidReceipt));
   }
   await validateCreateMedusaNpmShimExecution();
+  await validateCommandProbeExecution();
   assert.deepEqual(officialGeneratorNpmEnvironment(), {
     NPM_CONFIG_AUDIT: "false",
     NPM_CONFIG_FETCH_RETRIES: "6",
