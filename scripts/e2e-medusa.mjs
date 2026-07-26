@@ -303,6 +303,13 @@ function browserCompletionSummary({
   return messages;
 }
 
+function shouldKeepTemporaryWorkspace({
+  completedRun = completed,
+  keepRequested = keep,
+} = {}) {
+  return completedRun && keepRequested;
+}
+
 function parentHarnessRunAccepted({
   completedRun,
   exitCode,
@@ -4841,6 +4848,20 @@ async function runSanitizerSelfTest() {
     NPM_CONFIG_PREFER_OFFLINE: "true",
   });
   assert.equal(
+    shouldKeepTemporaryWorkspace({
+      completedRun: true,
+      keepRequested: true,
+    }),
+    true,
+  );
+  for (const rejectedKeepState of [
+    { completedRun: false, keepRequested: false },
+    { completedRun: false, keepRequested: true },
+    { completedRun: true, keepRequested: false },
+  ]) {
+    assert.equal(shouldKeepTemporaryWorkspace(rejectedKeepState), false);
+  }
+  assert.equal(
     assertBrowserRunMode({
       capture: false,
       diagnostics: false,
@@ -6708,7 +6729,10 @@ async function cleanupOnce() {
                 `[makepay-e2e] MANUAL CLEANUP BLOCKER: disposable PostgreSQL stop was not proven; retained PGDATA at ${temporaryRoot}. Stop that isolated cluster before removing the directory.\n`,
               ),
             );
-          } else if (temporaryRoot && !keep) {
+          } else if (
+            temporaryRoot &&
+            !shouldKeepTemporaryWorkspace()
+          ) {
             await rm(temporaryRoot, { force: true, recursive: true });
           } else if (temporaryRoot) {
             log(`Kept scrubbed temporary workspace: ${temporaryRoot}`);
