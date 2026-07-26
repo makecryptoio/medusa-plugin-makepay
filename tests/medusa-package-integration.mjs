@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
+  copyFileSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -12,6 +13,12 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const fixtureDirectory = join(
+  packageRoot,
+  "tests",
+  "fixtures",
+  "medusa-2.17.2",
+);
 const temporaryDirectory = mkdtempSync(join(tmpdir(), "makepay-medusa-"));
 const appDirectory = join(temporaryDirectory, "app");
 const packDirectory = join(temporaryDirectory, "pack");
@@ -74,38 +81,13 @@ try {
     readFileSync(join(packageRoot, "package.json"), "utf8"),
   );
 
-  writeFileSync(
+  copyFileSync(
+    join(fixtureDirectory, "package.json"),
     join(appDirectory, "package.json"),
-    JSON.stringify(
-      {
-        name: "makepay-medusa-packed-integration",
-        private: true,
-        dependencies: {
-          "@swc/core": "^1.7.28",
-          "@medusajs/admin-sdk": "2.17.2",
-          "@medusajs/cli": "2.17.2",
-          "@medusajs/dashboard": "2.17.2",
-          "@medusajs/draft-order": "2.17.2",
-          "@medusajs/framework": "2.17.2",
-          "@medusajs/icons": "2.17.2",
-          "@medusajs/js-sdk": "2.17.2",
-          "@medusajs/medusa": "2.17.2",
-          "@medusajs/ui": "4.1.19",
-          "@makecrypto/makepay": sdkTarball
-            ? `file:${resolve(sdkTarball)}`
-            : "0.4.0",
-          "@tanstack/react-query": "5.64.2",
-          jiti: "^2.0.0",
-          react: "18.3.1",
-          "react-dom": "18.3.1",
-          "react-router-dom": "6.30.4",
-          "ts-node": "^10.9.2",
-          typescript: "^5.6.2",
-        },
-      },
-      null,
-      2,
-    ) + "\n",
+  );
+  copyFileSync(
+    join(fixtureDirectory, "package-lock.json"),
+    join(appDirectory, "package-lock.json"),
   );
 
   writeFileSync(
@@ -298,9 +280,25 @@ try {
 `,
   );
 
-  run("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund"], {
+  run("npm", ["ci", "--ignore-scripts", "--no-audit", "--no-fund"], {
     cwd: appDirectory,
   });
+  if (sdkTarball) {
+    run(
+      "npm",
+      [
+        "install",
+        "--save-exact",
+        "--ignore-scripts",
+        "--no-audit",
+        "--no-fund",
+        `file:${resolve(sdkTarball)}`,
+      ],
+      {
+        cwd: appDirectory,
+      },
+    );
+  }
   run(
     "npm",
     [
