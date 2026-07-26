@@ -15,6 +15,12 @@ const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const temporaryDirectory = mkdtempSync(join(tmpdir(), "makepay-medusa-"));
 const appDirectory = join(temporaryDirectory, "app");
 const packDirectory = join(temporaryDirectory, "pack");
+const medusaExecutable = join(
+  appDirectory,
+  "node_modules",
+  ".bin",
+  process.platform === "win32" ? "medusa.cmd" : "medusa",
+);
 const schemaAuditPath = join(appDirectory, "makepay-schema-audit.mjs");
 const databaseUrl = process.env.DATABASE_URL;
 const sdkTarball = process.env.MAKEPAY_SDK_TARBALL;
@@ -88,7 +94,6 @@ try {
           "@makecrypto/makepay": sdkTarball
             ? `file:${resolve(sdkTarball)}`
             : "0.4.0",
-          "@makecrypto/medusa-plugin-makepay": `file:${pluginTarball}`,
           "@tanstack/react-query": "5.64.2",
           jiti: "^2.0.0",
           react: "18.3.1",
@@ -296,6 +301,20 @@ try {
   run("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund"], {
     cwd: appDirectory,
   });
+  run(
+    "npm",
+    [
+      "install",
+      "--save-exact",
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+      `file:${pluginTarball}`,
+    ],
+    {
+      cwd: appDirectory,
+    },
+  );
 
   const installedPackage = JSON.parse(
     readFileSync(
@@ -325,11 +344,11 @@ try {
     { cwd: appDirectory },
   );
 
-  run("npx", ["--no-install", "medusa", "db:migrate"], {
+  run(medusaExecutable, ["db:migrate"], {
     cwd: appDirectory,
     env: { DATABASE_URL: databaseUrl },
   });
-  run("npx", ["--no-install", "medusa", "db:migrate"], {
+  run(medusaExecutable, ["db:migrate"], {
     cwd: appDirectory,
     env: { DATABASE_URL: databaseUrl },
   });
@@ -337,7 +356,7 @@ try {
     cwd: appDirectory,
     env: { DATABASE_URL: databaseUrl, MAKEPAY_TEST_PRE_006: "1" },
   });
-  run("npx", ["--no-install", "medusa", "build"], {
+  run(medusaExecutable, ["build"], {
     cwd: appDirectory,
     env: { DATABASE_URL: databaseUrl },
   });
