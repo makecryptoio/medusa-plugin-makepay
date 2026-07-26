@@ -1,43 +1,60 @@
 {
   "name": "@makecrypto/medusa-plugin-makepay",
-  "version": "0.2.0",
-  "description": "Official MakePay payment provider for Medusa v2 hosted checkout. Register a merchant account at https://makepay.io.",
+  "version": "1.0.0",
+  "description": "Official MakePay hosted payment provider, OAuth connection, and Admin integration for Medusa v2.",
   "license": "MIT",
   "author": "MakePay",
   "homepage": "https://makepay.io",
   "bugs": {
-    "url": "https://github.com/makepay-io/medusa-plugin-makepay/issues"
+    "url": "https://github.com/makepay-apps/medusa-plugin-makepay/issues"
   },
   "type": "module",
-  "sideEffects": false,
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./.medusa/server/src/index.js",
+  "types": "./.medusa/server/src/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
+      "types": "./.medusa/server/src/index.d.ts",
+      "import": "./.medusa/server/src/index.js",
+      "default": "./.medusa/server/src/index.js"
     },
+    "./providers/*": "./.medusa/server/src/providers/*/index.js",
     "./providers/makepay": {
-      "types": "./dist/providers/makepay/index.d.ts",
-      "import": "./dist/providers/makepay/index.js",
-      "default": "./dist/providers/makepay/index.js"
+      "types": "./.medusa/server/src/providers/makepay/index.d.ts",
+      "import": "./.medusa/server/src/providers/makepay/index.js",
+      "default": "./.medusa/server/src/providers/makepay/index.js"
+    },
+    "./.medusa/server/src/modules/*": "./.medusa/server/src/modules/*/index.js",
+    "./modules/*": "./.medusa/server/src/modules/*/index.js",
+    "./modules/makepay": {
+      "types": "./.medusa/server/src/modules/makepay/index.d.ts",
+      "import": "./.medusa/server/src/modules/makepay/index.js",
+      "default": "./.medusa/server/src/modules/makepay/index.js"
+    },
+    "./admin": {
+      "import": "./.medusa/server/src/admin/index.js",
+      "require": "./.medusa/server/src/admin/index.cjs",
+      "default": "./.medusa/server/src/admin/index.js"
     },
     "./package.json": "./package.json"
   },
   "files": [
-    "dist",
-    "assets",
+    ".medusa/server",
+    "assets/makepay-medusa-icon.png",
+    "docs",
+    "CHANGELOG.md",
+    "MIGRATING.md",
     "README.md",
+    "RELEASE.md",
+    "SECURITY.md",
     "LICENSE",
     "package.json"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/makepay-io/medusa-plugin-makepay.git"
+    "url": "git+https://github.com/makepay-apps/medusa-plugin-makepay.git"
   },
   "keywords": [
     "medusa-plugin",
@@ -48,13 +65,25 @@
     "makecrypto",
     "crypto-payments",
     "payment-provider",
-    "hosted-checkout"
+    "hosted-checkout",
+    "oauth",
+    "medusa-admin"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.json",
-    "check": "npm run build && npm test && npm run pack:dry-run",
+    "build": "medusa plugin:build && node scripts/strip-source-maps.mjs",
+    "check": "npm run typecheck && npm run build && npm test && npm run test:package",
+    "prepack": "npm run build",
     "prepublishOnly": "npm run check",
-    "test": "node tests/run.mjs",
+    "test": "npm run test:unit && npm run test:sdk-contract && npm run test:e2e:contract",
+    "test:unit": "tsx --test tests/*.test.mjs",
+    "test:sdk-contract": "node tests/sdk-contract.mjs",
+    "test:e2e:contract": "node tests/e2e/contract-server.test.mjs && tsx --test tests/e2e/contract-module-oauth.test.mjs",
+    "test:e2e:medusa": "node scripts/e2e-medusa.mjs",
+    "test:e2e:real-sandbox": "node scripts/e2e-medusa.mjs --real-sandbox",
+    "test:e2e:screenshots": "node tests/e2e/screenshot-gate.mjs --manifest output/playwright/medusa-makepay/evidence/manifest.json --check candidate",
+    "test:integration": "node tests/medusa-package-integration.mjs",
+    "test:package": "node tests/package-artifact.mjs",
+    "typecheck": "tsc --noEmit",
     "pack:dry-run": "npm pack --dry-run --json"
   },
   "publishConfig": {
@@ -62,13 +91,42 @@
     "registry": "https://registry.npmjs.org/"
   },
   "peerDependencies": {
-    "@medusajs/framework": ">=2.3.0 <3.0.0"
+    "@medusajs/admin-sdk": ">=2.17.2 <3.0.0",
+    "@medusajs/framework": ">=2.17.2 <3.0.0",
+    "@medusajs/icons": ">=2.17.2 <3.0.0",
+    "@medusajs/js-sdk": ">=2.17.2 <3.0.0",
+    "@medusajs/medusa": ">=2.17.2 <3.0.0",
+    "@medusajs/ui": ">=4.1.19 <5.0.0",
+    "@tanstack/react-query": ">=5.64.2 <6.0.0",
+    "react": ">=18.2.0 <20.0.0",
+    "react-dom": ">=18.2.0 <20.0.0",
+    "react-router-dom": ">=6.30.4 <7.0.0"
   },
   "dependencies": {
-    "@makecrypto/makepay": "^0.3.0"
+    "@makecrypto/makepay": "0.4.0"
   },
   "devDependencies": {
-    "@medusajs/framework": "^2.15.2",
-    "typescript": "^5"
+    "@medusajs/admin-sdk": "2.17.2",
+    "@medusajs/cli": "2.17.2",
+    "@medusajs/framework": "2.17.2",
+    "@medusajs/icons": "2.17.2",
+    "@medusajs/js-sdk": "2.17.2",
+    "@medusajs/medusa": "2.17.2",
+    "@medusajs/ui": "4.1.19",
+    "@playwright/test": "1.61.1",
+    "@swc/core": "^1.7.28",
+    "@tanstack/react-query": "5.64.2",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.2",
+    "@types/react-dom": "^18.2.25",
+    "jiti": "^2.0.0",
+    "prop-types": "^15.8.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "6.30.4",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.2",
+    "vite": "^5.2.11"
   }
 }
