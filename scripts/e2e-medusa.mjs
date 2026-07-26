@@ -5752,6 +5752,7 @@ async function runSanitizerSelfTest() {
       cwd: packageRoot,
       encoding: "utf8",
       env: childEnvironment({
+        CI: "",
         MAKEPAY_E2E_LOCAL_DIAGNOSTICS: "1",
         MAKEPAY_E2E_REAL_SANDBOX: "1",
         MAKEPAY_E2E_TEST_MATCH: "real-sandbox.spec.mjs",
