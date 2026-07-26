@@ -243,6 +243,7 @@ let contractCaPath;
 let temporaryRoot;
 let activeProjectRoot;
 let activeProjectOwned = false;
+let generatedProjectRoot;
 let realSandboxControl;
 let oauthControl;
 let apiKeyControl;
@@ -308,6 +309,13 @@ function shouldKeepTemporaryWorkspace({
   keepRequested = keep,
 } = {}) {
   return completedRun && keepRequested;
+}
+
+function failedGeneratedProjectScrubPath({
+  completedRun = completed,
+  projectRoot = generatedProjectRoot,
+} = {}) {
+  return completedRun ? undefined : projectRoot;
 }
 
 function parentHarnessRunAccepted({
@@ -2435,6 +2443,7 @@ function officialGeneratorNpmEnvironment() {
     NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "60000",
     NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "10000",
     NPM_CONFIG_FUND: "false",
+    NPM_CONFIG_LOGS_MAX: "0",
     NPM_CONFIG_MAXSOCKETS: "5",
     NPM_CONFIG_PREFER_OFFLINE: "true",
   };
@@ -2448,6 +2457,7 @@ async function scaffoldProject(root, databaseUrl) {
     return projectRoot;
   }
   const projectName = "medusa-app";
+  generatedProjectRoot = join(root, projectName);
   await run(
     "npx",
     [
@@ -4678,6 +4688,7 @@ async function scrubPlaywrightArtifacts() {
 
 async function scrubRuntimeSecrets() {
   const paths = [
+    failedGeneratedProjectScrubPath(),
     activeProjectOwned &&
       activeProjectRoot &&
       join(activeProjectRoot, "apps/backend/.env"),
@@ -4844,6 +4855,7 @@ async function runSanitizerSelfTest() {
     NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "60000",
     NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "10000",
     NPM_CONFIG_FUND: "false",
+    NPM_CONFIG_LOGS_MAX: "0",
     NPM_CONFIG_MAXSOCKETS: "5",
     NPM_CONFIG_PREFER_OFFLINE: "true",
   });
@@ -4861,6 +4873,20 @@ async function runSanitizerSelfTest() {
   ]) {
     assert.equal(shouldKeepTemporaryWorkspace(rejectedKeepState), false);
   }
+  assert.equal(
+    failedGeneratedProjectScrubPath({
+      completedRun: false,
+      projectRoot: "/tmp/owned-medusa-app",
+    }),
+    "/tmp/owned-medusa-app",
+  );
+  assert.equal(
+    failedGeneratedProjectScrubPath({
+      completedRun: true,
+      projectRoot: "/tmp/owned-medusa-app",
+    }),
+    undefined,
+  );
   assert.equal(
     assertBrowserRunMode({
       capture: false,
