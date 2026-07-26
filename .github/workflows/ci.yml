@@ -137,7 +137,12 @@ jobs:
           CI: true
           MAKEPAY_E2E_API_KEY_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/makepay_api_key_e2e
           MAKEPAY_E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/makepay_medusa_e2e
-        run: npm run test:e2e:medusa
+        run: |
+          test -d "$HOME/.npm"
+          test ! -L "$HOME/.npm"
+          test "$(stat -c '%u' "$HOME/.npm")" = "$(id -u)"
+          chmod 700 "$HOME/.npm"
+          MAKEPAY_E2E_NPM_CACHE_DIR="$HOME/.npm" npm run test:e2e:medusa
 
       - name: Upload sanitized runtime logs
         if: always()

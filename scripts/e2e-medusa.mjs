@@ -2420,6 +2420,19 @@ async function validateReusableProjectRoot(value) {
   return projectRoot;
 }
 
+function officialGeneratorNpmEnvironment() {
+  return {
+    NPM_CONFIG_AUDIT: "false",
+    NPM_CONFIG_FETCH_RETRIES: "6",
+    NPM_CONFIG_FETCH_RETRY_FACTOR: "2",
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "60000",
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "10000",
+    NPM_CONFIG_FUND: "false",
+    NPM_CONFIG_MAXSOCKETS: "5",
+    NPM_CONFIG_PREFER_OFFLINE: "true",
+  };
+}
+
 async function scaffoldProject(root, databaseUrl) {
   const existing = process.env.MAKEPAY_E2E_PROJECT_ROOT;
   if (existing) {
@@ -2445,7 +2458,10 @@ async function scaffoldProject(root, databaseUrl) {
       "--version",
       "2.17.2",
     ],
-    { cwd: root },
+    {
+      cwd: root,
+      env: officialGeneratorNpmEnvironment(),
+    },
   );
   const projectRoot = await realpath(join(root, projectName));
   await Promise.all([
@@ -4814,6 +4830,16 @@ async function runSignalWorkerMatrix(root) {
 
 async function runSanitizerSelfTest() {
   assert.match(runId, /^medusa-e2e-.+-[a-f0-9]{16}$/);
+  assert.deepEqual(officialGeneratorNpmEnvironment(), {
+    NPM_CONFIG_AUDIT: "false",
+    NPM_CONFIG_FETCH_RETRIES: "6",
+    NPM_CONFIG_FETCH_RETRY_FACTOR: "2",
+    NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "60000",
+    NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "10000",
+    NPM_CONFIG_FUND: "false",
+    NPM_CONFIG_MAXSOCKETS: "5",
+    NPM_CONFIG_PREFER_OFFLINE: "true",
+  });
   assert.equal(
     assertBrowserRunMode({
       capture: false,
