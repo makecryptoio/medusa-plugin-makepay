@@ -304,6 +304,10 @@ try {
     [
       "install",
       "--save-exact",
+      // npm 11.16 can mislabel an already installed peer as `undefined`
+      // while resolving a local tarball. Force only that local install, then
+      // validate every peer and the complete dependency tree below.
+      "--force",
       "--ignore-scripts",
       "--no-audit",
       "--no-fund",
@@ -324,6 +328,45 @@ try {
     ),
   );
   assert.equal(installedPackage.version, pluginPackage.version);
+  const expectedInstalledVersions = {
+    "@makecrypto/makepay": "0.4.0",
+    "@medusajs/admin-sdk": "2.17.2",
+    "@medusajs/framework": "2.17.2",
+    "@medusajs/icons": "2.17.2",
+    "@medusajs/js-sdk": "2.17.2",
+    "@medusajs/medusa": "2.17.2",
+    "@medusajs/ui": "4.1.19",
+    "@tanstack/react-query": "5.64.2",
+    react: "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.30.4",
+  };
+  for (const [packageName, expectedVersion] of Object.entries(
+    expectedInstalledVersions,
+  )) {
+    const installedDependency = JSON.parse(
+      readFileSync(
+        join(appDirectory, "node_modules", packageName, "package.json"),
+        "utf8",
+      ),
+    );
+    assert.equal(
+      installedDependency.version,
+      expectedVersion,
+      `${packageName} must match the locked Medusa fixture`,
+    );
+    if (packageName !== "@makecrypto/makepay") {
+      assert.ok(
+        installedPackage.peerDependencies?.[packageName],
+        `${packageName} must remain a declared plugin peer`,
+      );
+    }
+  }
+  execFileSync("npm", ["ls", "--all", "--omit=dev"], {
+    cwd: appDirectory,
+    env: process.env,
+    stdio: "pipe",
+  });
 
   const installedConfig = readFileSync(
     join(appDirectory, "medusa-config.ts"),
