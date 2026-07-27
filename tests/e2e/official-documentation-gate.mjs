@@ -411,8 +411,10 @@ async function main() {
           );
           const sample = (source) => {
             const canvas = document.createElement("canvas");
-            canvas.width = 32;
-            canvas.height = 20;
+            // Preserve enough small, low-contrast Admin UI details to avoid
+            // collapsing a valid render into only a few coarse color buckets.
+            canvas.width = 64;
+            canvas.height = 40;
             const context = canvas.getContext("2d", {
               willReadFrequently: true,
             });
