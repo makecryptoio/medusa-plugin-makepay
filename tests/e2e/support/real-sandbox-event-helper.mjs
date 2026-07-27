@@ -903,7 +903,7 @@ function signedHeaders(body, event, secret) {
     .digest("hex");
   return {
     "content-type": "application/json",
-    "user-agent": "makepay-medusa-real-sandbox-e2e/1.0.0",
+    "user-agent": "makepay-medusa-real-sandbox-e2e/1.0.1",
     "x-makepay-attempt": "1",
     "x-makepay-delivery-group-id": event.deliveryGroupId,
     "x-makepay-delivery-id": event.deliveryId,

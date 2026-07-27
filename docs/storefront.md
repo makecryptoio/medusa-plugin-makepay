@@ -1,6 +1,6 @@
 # Hosted checkout in a storefront
 
-MakePay 1.0.0 uses Medusa's `pending_authorization` lifecycle. The important
+MakePay 1.0.x uses Medusa's `pending_authorization` lifecycle. The important
 ordering is:
 
 1. Initiate `pp_makepay_makepay` for the complete cart.

@@ -131,7 +131,7 @@ try {
   );
 
   assert.equal(pkg.name, "@makecrypto/medusa-plugin-makepay");
-  assert.equal(pkg.version, "1.0.0");
+  assert.equal(pkg.version, "1.0.1");
   assert.match(pkg.engines?.node ?? "", />=\s*22/);
   assert.match(pkg.peerDependencies?.["@medusajs/framework"] ?? "", /2\.17\.2/);
   assert.match(pkg.peerDependencies?.["@medusajs/medusa"] ?? "", /2\.17\.2/);
@@ -545,7 +545,7 @@ globalThis.__makePayAdminExport = {
     files.every((file) => Number.isInteger(file.size) && file.size >= 0),
     "npm did not report deterministic file sizes",
   );
-  assert.ok(filename.endsWith("-1.0.0.tgz"), `unexpected tarball ${filename}`);
+  assert.ok(filename.endsWith("-1.0.1.tgz"), `unexpected tarball ${filename}`);
 
   console.log(`Verified ${filename} (${files.length} files).`);
 } finally {

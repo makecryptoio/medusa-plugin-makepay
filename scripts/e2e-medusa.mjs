@@ -1924,7 +1924,7 @@ async function packPlugin(root) {
     return artifactFromTarball({
       expectedName: "@makecrypto/medusa-plugin-makepay",
       expectedSha256: process.env.MAKEPAY_PLUGIN_TARBALL_SHA256,
-      expectedVersion: "1.0.0",
+      expectedVersion: "1.0.1",
       label: "Packed plugin",
       tarball: suppliedTarball,
     });
@@ -1942,7 +1942,7 @@ async function packPlugin(root) {
   return artifactFromTarball({
     expectedName: "@makecrypto/medusa-plugin-makepay",
     expectedSha256: process.env.MAKEPAY_PLUGIN_TARBALL_SHA256,
-    expectedVersion: "1.0.0",
+    expectedVersion: "1.0.1",
     label: "Packed plugin",
     tarball,
   });
@@ -2964,8 +2964,9 @@ async function installAndPatch(projectRoot, pluginArtifact) {
     ),
   ]);
   // Reusable fixtures can retain the same package version from a prior packed
-  // artifact. Uninstall it completely so npm cannot treat different 1.0.0
-  // tarball bytes as already satisfied, then resolve the fresh artifacts.
+  // artifact. Uninstall it completely so npm cannot treat different tarball
+  // bytes at the same version as already satisfied, then resolve fresh
+  // artifacts.
   await run(
     "npm",
     [

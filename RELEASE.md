@@ -36,7 +36,7 @@ Before tagging a release:
    expired, and cancelled case; the original immutable session/UID must capture
    exactly once and later unsuccessful events must not downgrade it. None of
    those responses may expose secrets. The API-key URL is retained for
-   compatibility, but 1.0.0 intercepts MakePay callbacks and completes their
+   compatibility, but 1.0.x intercepts MakePay callbacks and completes their
    validation and correlated effects synchronously.
    Connect two isolated Medusa installations to the same sandbox company and
    verify subscription isolation. Rotate and disconnect one after issuing a
@@ -111,7 +111,7 @@ export MAKEPAY_E2E_REAL_CHECKOUT_URL=https://approved-makepay-checkout.example
 export MAKEPAY_E2E_REAL_OAUTH_ISSUER_URL=https://approved-oauth-issuer.example
 export MAKEPAY_E2E_SANDBOX_COMPANY_ID=company_sandbox_id
 export MAKEPAY_E2E_SANDBOX_COMPANY_NAME='Publication-safe Sandbox Merchant'
-export MAKEPAY_PLUGIN_TARBALL=/absolute/path/to/makecrypto-medusa-plugin-makepay-1.0.0.tgz
+export MAKEPAY_PLUGIN_TARBALL=/absolute/path/to/makecrypto-medusa-plugin-makepay-1.0.1.tgz
 export MAKEPAY_PLUGIN_TARBALL_SHA256=64_lowercase_hex_plugin_sha256
 export MAKEPAY_SDK_TARBALL=/absolute/path/to/makecrypto-makepay-0.4.0.tgz
 export MAKEPAY_SDK_TARBALL_SHA256=64_lowercase_hex_sdk_sha256
@@ -134,16 +134,16 @@ storage-state option must be an owner-controlled `0600` file outside the
 repository containing only the approved issuer's cookies/origins. See
 `docs/local-e2e.md` for capture review and screenshot release commands.
 
-## 1.0.0 dependency sequence
+## 1.0.1 dependency sequence
 
-`@makecrypto/medusa-plugin-makepay@1.0.0` depends on the exact
+`@makecrypto/medusa-plugin-makepay@1.0.1` depends on the exact
 `@makecrypto/makepay@0.4.0`. Publish SDK `0.4.0` to `next`, install and smoke the
 exact registry artifact, and only then promote that same SDK version to
 `latest`. Do not merge or tag the plugin while its lockfile still resolves an
 older SDK or a local tarball.
 
 After SDK promotion, regenerate `package-lock.json` from the public registry,
-verify its root package is `1.0.0` and its SDK dependency is exactly `0.4.0`,
+verify its root package is `1.0.1` and its SDK dependency is exactly `0.4.0`,
 then run `npm ci` and every gate below from that clean install. Local `file:`
 tarball or workspace entries are useful before the SDK release but must never
 enter the reviewed plugin lockfile.
@@ -177,8 +177,8 @@ result in the GitHub release notes.
 ## Failure and rollback
 
 - Before promotion, leave `latest` unchanged and publish a corrected version.
-- If `1.0.0` fails after promotion, move `latest` back to `0.2.0`, deprecate
-  `1.0.0` with a useful message, and publish the correction as `1.0.1`. Do not
+- If `1.0.1` fails after promotion, move `latest` back to `1.0.0`, deprecate
+  `1.0.1` with a useful message, and publish the correction as `1.0.2`. Do not
   unpublish an artifact that consumers may already have installed.
 - Leave additive database tables in place during an application rollback.
 - Version bumps are made only when maintainers intend to publish; npm versions
