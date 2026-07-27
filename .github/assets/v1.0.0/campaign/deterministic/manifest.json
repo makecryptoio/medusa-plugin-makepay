@@ -1,0 +1,201 @@
+{
+  "approvedOrigins": {},
+  "artifactProvenance": {
+    "plugin": {
+      "sha256": "f89250fe8f2bb90c9be381496d171da7f864598d32719518c6f3b99e044d775c",
+      "version": "1.0.0"
+    },
+    "sdk": {
+      "sha256": "b597fc487f3be8829655505d5bbc2966eb02b80421ca6cf8a57d9a507d324672",
+      "version": "0.4.0"
+    }
+  },
+  "completionAttestation": {
+    "acceptedAt": "2026-07-27T10:03:49.614Z",
+    "checks": {
+      "artifactInstallVerified": true,
+      "childProcessesTerminated": true,
+      "controlPlanesClosed": true,
+      "foregroundWorkQuiesced": true,
+      "playwrightScenarioCompleted": true,
+      "postgresStopped": true,
+      "runtimeLogsPublished": true,
+      "runtimeSecretsScrubbed": true,
+      "temporaryWorkspaceDispositionAccepted": true
+    },
+    "evidenceDigest": "784fefd0d98f26bff6c3f8999e36543d5ef6147bdc69ad3de451e637db0a7d77",
+    "mode": "deterministic",
+    "runId": "medusa-e2e-2026-07-27T09-55-59-699Z-d9270ffd7b55d590",
+    "scenario": "deterministic-playwright",
+    "status": "accepted"
+  },
+  "correlation": null,
+  "evidence": [
+    {
+      "artifactProvenance": {
+        "plugin": {
+          "sha256": "f89250fe8f2bb90c9be381496d171da7f864598d32719518c6f3b99e044d775c",
+          "version": "1.0.0"
+        },
+        "sdk": {
+          "sha256": "b597fc487f3be8829655505d5bbc2966eb02b80421ca6cf8a57d9a507d324672",
+          "version": "0.4.0"
+        }
+      },
+      "capturedAt": "2026-07-27T10:01:53.126Z",
+      "correlation": null,
+      "docsReview": {
+        "status": "pending"
+      },
+      "expectedPath": "/app/settings/makepay",
+      "filename": "connected-makepay-settings.png",
+      "mode": "deterministic",
+      "origin": "http://127.0.0.1:9000",
+      "pathname": "/app/settings/makepay",
+      "requiredTestIds": [
+        "makepay-settings-page"
+      ],
+      "requiredTexts": [
+        "MakePay",
+        "Disconnect"
+      ],
+      "runId": "medusa-e2e-2026-07-27T09-55-59-699Z-d9270ffd7b55d590",
+      "sha256": "5b37aa4af927f51dcdc9279fc83f0ac9e0ee6f99f9574e5840bc73e106eeb4a9",
+      "title": "Settings - Medusa",
+      "url": "http://127.0.0.1:9000/app/settings/makepay",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "visualReview": {
+        "status": "pending"
+      }
+    },
+    {
+      "artifactProvenance": {
+        "plugin": {
+          "sha256": "f89250fe8f2bb90c9be381496d171da7f864598d32719518c6f3b99e044d775c",
+          "version": "1.0.0"
+        },
+        "sdk": {
+          "sha256": "b597fc487f3be8829655505d5bbc2966eb02b80421ca6cf8a57d9a507d324672",
+          "version": "0.4.0"
+        }
+      },
+      "capturedAt": "2026-07-27T10:01:56.158Z",
+      "correlation": null,
+      "docsReview": {
+        "status": "pending"
+      },
+      "expectedPath": "/\\/payment\\/pay_e2e_/",
+      "filename": "makepay-sandbox-checkout.png",
+      "mode": "deterministic",
+      "origin": "https://127.0.0.1:59293",
+      "pathname": "/payment/pay_e2e_80a057094e5850454190e49b",
+      "requiredTestIds": [
+        "sandbox-checkout",
+        "start-payment"
+      ],
+      "requiredTexts": [
+        "Sandbox mode",
+        "Do not send real funds"
+      ],
+      "runId": "medusa-e2e-2026-07-27T09-55-59-699Z-d9270ffd7b55d590",
+      "sha256": "902740397f3ac6dd658377ba283559fb441a2bf522f5bd110270f46d3cc7c1fd",
+      "title": "MakePay sandbox checkout",
+      "url": "https://127.0.0.1:59293/payment/pay_e2e_80a057094e5850454190e49b",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "visualReview": {
+        "status": "pending"
+      }
+    },
+    {
+      "artifactProvenance": {
+        "plugin": {
+          "sha256": "f89250fe8f2bb90c9be381496d171da7f864598d32719518c6f3b99e044d775c",
+          "version": "1.0.0"
+        },
+        "sdk": {
+          "sha256": "b597fc487f3be8829655505d5bbc2966eb02b80421ca6cf8a57d9a507d324672",
+          "version": "0.4.0"
+        }
+      },
+      "capturedAt": "2026-07-27T10:02:03.201Z",
+      "correlation": null,
+      "docsReview": {
+        "status": "pending"
+      },
+      "expectedPath": "/app/makepay",
+      "filename": "makepay-payments-list.png",
+      "mode": "deterministic",
+      "origin": "http://127.0.0.1:9000",
+      "pathname": "/app/makepay",
+      "requiredTestIds": [
+        "makepay-payments-page",
+        "makepay-sidebar-logo"
+      ],
+      "requiredTexts": [
+        "MakePay payments",
+        "pay_e2e_80a057094e5850454190e49b"
+      ],
+      "runId": "medusa-e2e-2026-07-27T09-55-59-699Z-d9270ffd7b55d590",
+      "sha256": "238e7614d2d9ba5baab408d8d2a8bc67e23a727f7ff37ccc13a840714243fdab",
+      "title": "Medusa",
+      "url": "http://127.0.0.1:9000/app/makepay",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "visualReview": {
+        "status": "pending"
+      }
+    },
+    {
+      "artifactProvenance": {
+        "plugin": {
+          "sha256": "f89250fe8f2bb90c9be381496d171da7f864598d32719518c6f3b99e044d775c",
+          "version": "1.0.0"
+        },
+        "sdk": {
+          "sha256": "b597fc487f3be8829655505d5bbc2966eb02b80421ca6cf8a57d9a507d324672",
+          "version": "0.4.0"
+        }
+      },
+      "capturedAt": "2026-07-27T10:02:03.652Z",
+      "correlation": null,
+      "docsReview": {
+        "status": "pending"
+      },
+      "expectedPath": "/\\/app\\/orders\\/order_01KYHGC8ECPP3K9DDAC4T36KM2$/",
+      "filename": "makepay-order-widget.png",
+      "mode": "deterministic",
+      "origin": "http://127.0.0.1:9000",
+      "pathname": "/app/orders/order_01KYHGC8ECPP3K9DDAC4T36KM2",
+      "requiredTestIds": [
+        "makepay-order-widget"
+      ],
+      "requiredTexts": [
+        "MakePay",
+        "pay_e2e_80a057094e5850454190e49b",
+        "Automated refunds aren't supported"
+      ],
+      "runId": "medusa-e2e-2026-07-27T09-55-59-699Z-d9270ffd7b55d590",
+      "sha256": "8f3921a5b9a09588a140cace016c0d0aa3506e98791789a4b40919ae259e8578",
+      "title": "#1 - Medusa",
+      "url": "http://127.0.0.1:9000/app/orders/order_01KYHGC8ECPP3K9DDAC4T36KM2",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "visualReview": {
+        "status": "pending"
+      }
+    }
+  ],
+  "mode": "deterministic",
+  "runId": "medusa-e2e-2026-07-27T09-55-59-699Z-d9270ffd7b55d590",
+  "schemaVersion": 3
+}

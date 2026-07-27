@@ -1,0 +1,913 @@
+name: Publish npm candidate
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: npm-publish-${{ github.repository }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare-candidate:
+    name: Validate and pack without OIDC
+    runs-on: ubuntu-latest
+    outputs:
+      candidate-sha256: ${{ steps.candidate-metadata.outputs.sha256 }}
+
+    steps:
+      - name: Checkout the release commit
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24.18.0
+          package-manager-cache: false
+
+      - name: Verify reproducible packer toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.16.0"
+
+      - name: Verify tag, version, and main ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          if [[ "${GITHUB_REF_TYPE}" != "tag" || "${GITHUB_REF_NAME}" != "v${version}" ]]; then
+            echo "Release must run from tag v${version}." >&2
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run release gates
+        run: npm run check
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Install Chromium for official documentation verification
+        run: npx playwright install --with-deps chromium
+
+      - name: Pack the exact reviewed build
+        id: candidate-metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf release-candidate
+          mkdir release-candidate
+          npm pack --ignore-scripts --json --pack-destination release-candidate > "${RUNNER_TEMP}/makepay-pack.json"
+          PACK_JSON="${RUNNER_TEMP}/makepay-pack.json" node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto"
+          import { readFileSync, writeFileSync } from "node:fs"
+          import { join } from "node:path"
+
+          const [packed] = JSON.parse(readFileSync(process.env.PACK_JSON, "utf8"))
+          const pkg = JSON.parse(readFileSync("package.json", "utf8"))
+          if (!packed?.filename || packed.name !== pkg.name || packed.version !== pkg.version) {
+            throw new Error("npm pack identity does not match package.json")
+          }
+          const tarball = join("release-candidate", packed.filename)
+          const bytes = readFileSync(tarball)
+          writeFileSync(
+            join("release-candidate", "candidate.json"),
+            `${JSON.stringify(
+              {
+                commit: process.env.GITHUB_SHA,
+                filename: packed.filename,
+                integrity: packed.integrity,
+                name: packed.name,
+                sha1: packed.shasum,
+                sha256: createHash("sha256").update(bytes).digest("hex"),
+                size: bytes.length,
+                version: packed.version,
+              },
+              null,
+              2,
+            )}\n`,
+          )
+          NODE
+          echo "sha256=$(node -p "require('./release-candidate/candidate.json').sha256")" \
+            >> "${GITHUB_OUTPUT}"
+
+      - name: Require accepted release screenshot evidence
+        shell: bash
+        env:
+          EVIDENCE_BACKEND_ORIGIN: ${{ vars.MAKEPAY_EVIDENCE_BACKEND_ORIGIN }}
+          EVIDENCE_CHECKOUT_ORIGIN: ${{ vars.MAKEPAY_EVIDENCE_CHECKOUT_ORIGIN }}
+        run: |
+          set -euo pipefail
+          test -n "${EVIDENCE_BACKEND_ORIGIN}"
+          test -n "${EVIDENCE_CHECKOUT_ORIGIN}"
+
+          version="$(node -p "require('./package.json').version")"
+          sdk_version="$(node -p "require('./package.json').dependencies['@makecrypto/makepay']")"
+          manifest=".github/assets/v${version}/manifest.json"
+          campaign=""
+          if [[ "${version}" == "1.0.0" ]]; then
+            campaign=".github/assets/v${version}/release-campaign.json"
+            test -f "${campaign}"
+          fi
+          published_root=".github/assets/v${version}/makecrypto/public"
+          test -f "${manifest}"
+          test -d "${published_root}"
+          test -f "$(dirname "${published_root}")/package.json"
+          test -f "$(dirname "${published_root}")/content/documentation/apps/medusa.mdx"
+
+          mkdir -p "${RUNNER_TEMP}/makepay-sdk-evidence"
+          npm pack "@makecrypto/makepay@${sdk_version}" \
+            --ignore-scripts \
+            --json \
+            --pack-destination "${RUNNER_TEMP}/makepay-sdk-evidence" \
+            > "${RUNNER_TEMP}/makepay-sdk-pack.json"
+
+          PLUGIN_CANDIDATE="release-candidate/candidate.json" \
+          SDK_PACK_JSON="${RUNNER_TEMP}/makepay-sdk-pack.json" \
+          SDK_DIRECTORY="${RUNNER_TEMP}/makepay-sdk-evidence" \
+          MANIFEST="${manifest}" \
+          CAMPAIGN="${campaign}" \
+          PUBLISHED_ROOT="${published_root}" \
+          BACKEND_ORIGIN="${EVIDENCE_BACKEND_ORIGIN}" \
+          CHECKOUT_ORIGIN="${EVIDENCE_CHECKOUT_ORIGIN}" \
+          node --input-type=module <<'NODE'
+          import { createHash } from "node:crypto"
+          import { readFileSync } from "node:fs"
+          import { join } from "node:path"
+          import { spawnSync } from "node:child_process"
+
+          const plugin = JSON.parse(
+            readFileSync(process.env.PLUGIN_CANDIDATE, "utf8"),
+          )
+          const [sdk] = JSON.parse(readFileSync(process.env.SDK_PACK_JSON, "utf8"))
+          if (!sdk?.filename || !sdk?.version) {
+            throw new Error("SDK registry pack did not return an immutable artifact")
+          }
+          const sdkBytes = readFileSync(join(process.env.SDK_DIRECTORY, sdk.filename))
+          const args = [
+              "tests/e2e/screenshot-gate.mjs",
+              "--manifest",
+              process.env.MANIFEST,
+              "--published-root",
+              process.env.PUBLISHED_ROOT,
+              "--backend-origin",
+              process.env.BACKEND_ORIGIN,
+              "--checkout-origin",
+              process.env.CHECKOUT_ORIGIN,
+              "--plugin-sha256",
+              plugin.sha256,
+              "--plugin-version",
+              plugin.version,
+              "--sdk-sha256",
+              createHash("sha256").update(sdkBytes).digest("hex"),
+              "--sdk-version",
+              sdk.version,
+              "--check",
+              "release",
+            ]
+          if (process.env.CAMPAIGN) {
+            args.push("--campaign", process.env.CAMPAIGN)
+          }
+          const result = spawnSync(
+            process.execPath,
+            args,
+            { encoding: "utf8", stdio: ["ignore", "inherit", "inherit"] },
+          )
+          if (result.status !== 0) {
+            throw new Error("Real-sandbox screenshot release gate failed")
+          }
+          NODE
+
+          documentation_args=(--manifest "${manifest}")
+          if [[ -n "${campaign}" ]]; then
+            documentation_args+=(--campaign "${campaign}")
+          fi
+          node tests/e2e/official-documentation-gate.mjs \
+            "${documentation_args[@]}"
+
+      - name: Upload immutable npm candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: npm-release-candidate
+          if-no-files-found: error
+          path: release-candidate
+          retention-days: 1
+
+  publish-next:
+    name: Publish immutable candidate to next
+    runs-on: ubuntu-latest
+    needs: prepare-candidate
+    environment: npm-next
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout the exact release commit
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js for trusted publishing
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 24.18.0
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify trusted-publishing toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.16.0"
+
+      - name: Install release-verification dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Download the validated candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir release-candidate
+          gh run download "${GITHUB_RUN_ID}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name npm-release-candidate \
+            --dir release-candidate
+
+      - name: Verify downloaded tarball identity and digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="release-candidate/candidate.json"
+          test -f "${candidate}"
+          filename="$(CANDIDATE="${candidate}" node -p "require('./' + process.env.CANDIDATE).filename")"
+          tarball="release-candidate/${filename}"
+          test -f "${tarball}"
+          CANDIDATE="${candidate}" \
+          TARBALL="${tarball}" \
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict"
+          import { createHash } from "node:crypto"
+          import { readFileSync } from "node:fs"
+          import { basename } from "node:path"
+
+          const candidate = JSON.parse(readFileSync(process.env.CANDIDATE, "utf8"))
+          assert.equal(candidate.filename, basename(candidate.filename))
+          assert.match(candidate.filename, /^[a-z0-9][a-z0-9._-]*\.tgz$/)
+          const tarball = readFileSync(process.env.TARBALL)
+          assert.equal(candidate.commit, process.env.GITHUB_SHA)
+          assert.equal(process.env.GITHUB_REF_TYPE, "tag")
+          assert.equal(process.env.GITHUB_REF_NAME, `v${candidate.version}`)
+          assert.equal(tarball.length, candidate.size)
+          assert.equal(
+            createHash("sha256").update(tarball).digest("hex"),
+            candidate.sha256,
+          )
+          assert.equal(
+            createHash("sha1").update(tarball).digest("hex"),
+            candidate.sha1,
+          )
+          assert.equal(
+            `sha512-${createHash("sha512").update(tarball).digest("base64")}`,
+            candidate.integrity,
+          )
+          NODE
+          tar -xOf "${tarball}" package/package.json > "${RUNNER_TEMP}/packed-package.json"
+          CANDIDATE="${candidate}" \
+          PACKED_PACKAGE="${RUNNER_TEMP}/packed-package.json" \
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict"
+          import { readFileSync } from "node:fs"
+
+          const candidate = JSON.parse(readFileSync(process.env.CANDIDATE, "utf8"))
+          const packed = JSON.parse(readFileSync(process.env.PACKED_PACKAGE, "utf8"))
+          assert.equal(packed.name, candidate.name)
+          assert.equal(packed.version, candidate.version)
+          NODE
+
+      - name: Refuse to overwrite an existing version
+        shell: bash
+        run: |
+          set -euo pipefail
+          package="$(node -p "require('./release-candidate/candidate.json').name")"
+          version="$(node -p "require('./release-candidate/candidate.json').version")"
+          if npm view "${package}@${version}" version >/dev/null 2>&1; then
+            echo "${package}@${version} is already published and is immutable." >&2
+            exit 1
+          fi
+
+      - name: Revalidate live documentation after release approval
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./release-candidate/candidate.json').version")"
+          campaign_args=()
+          if [[ "${version}" == "1.0.0" ]]; then
+            campaign=".github/assets/v${version}/release-campaign.json"
+            test -f "${campaign}"
+            campaign_args=(--campaign "${campaign}")
+          fi
+          node tests/e2e/official-documentation-gate.mjs \
+            --manifest ".github/assets/v${version}/manifest.json" \
+            "${campaign_args[@]}"
+
+      - name: Publish candidate with npm trusted publishing
+        run: |
+          set -euo pipefail
+          filename="$(node -p "require('./release-candidate/candidate.json').filename")"
+          npm publish "./release-candidate/${filename}" \
+            --ignore-scripts \
+            --provenance \
+            --access public \
+            --tag next
+
+  verify-next-registry:
+    name: Verify exact next registry artifact
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-candidate
+      - publish-next
+    timeout-minutes: 90
+    permissions:
+      actions: read
+      contents: read
+    env:
+      EXPECTED_CANDIDATE_SHA256: ${{ needs.prepare-candidate.outputs.candidate-sha256 }}
+      NPM_CONFIG_CACHE: ${{ github.workspace }}/.npm-registry-verify-cache
+      NPM_CONFIG_PREFER_ONLINE: "true"
+      NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+      RELEASE_NODE_VERSION: 24.18.0
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: makepay_medusa_e2e
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d makepay_medusa_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      postgres_api_key:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: makepay_api_key_e2e
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d makepay_api_key_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout the exact release commit
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js for registry verification
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ env.RELEASE_NODE_VERSION }}
+          package-manager-cache: false
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify registry-verification toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node --version)" = "v24.18.0"
+          test "$(npm --version)" = "11.16.0"
+
+      - name: Download the immutable published candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir release-candidate
+          gh run download "${GITHUB_RUN_ID}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --name npm-release-candidate \
+            --dir release-candidate
+          mkdir registry-evidence
+
+      - name: Wait for the exact version and next dist-tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="release-candidate/candidate.json"
+          test -f "${candidate}"
+          package="$(CANDIDATE="${candidate}" node -p "require('./' + process.env.CANDIDATE).name")"
+          version="$(CANDIDATE="${candidate}" node -p "require('./' + process.env.CANDIDATE).version")"
+          spec="${package}@${version}"
+          metadata="registry-evidence/registry-version.json"
+          tags="registry-evidence/registry-tags.json"
+
+          found=0
+          for attempt in $(seq 1 24); do
+            if npm view "${spec}" --json > "${metadata}" 2>/dev/null; then
+              found=1
+              break
+            fi
+            echo "Waiting for ${spec} registry metadata (${attempt}/24)."
+            sleep 5
+          done
+          if [[ "${found}" != "1" ]]; then
+            echo "${spec} did not become available within 120 seconds." >&2
+            exit 1
+          fi
+
+          CANDIDATE="${candidate}" \
+          REGISTRY_METADATA="${metadata}" \
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict"
+          import { readFileSync } from "node:fs"
+
+          const candidate = JSON.parse(
+            readFileSync(process.env.CANDIDATE, "utf8"),
+          )
+          const registry = JSON.parse(
+            readFileSync(process.env.REGISTRY_METADATA, "utf8"),
+          )
+          assert.equal(candidate.name, "@makecrypto/medusa-plugin-makepay")
+          assert.match(candidate.version, /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/)
+          assert.equal(candidate.commit, process.env.GITHUB_SHA)
+          assert.equal(process.env.GITHUB_REF_TYPE, "tag")
+          assert.equal(process.env.GITHUB_REF_NAME, `v${candidate.version}`)
+          assert.match(candidate.sha1, /^[a-f0-9]{40}$/)
+          assert.match(candidate.sha256, /^[a-f0-9]{64}$/)
+          assert.equal(
+            candidate.sha256,
+            process.env.EXPECTED_CANDIDATE_SHA256,
+          )
+          assert.match(candidate.integrity, /^sha512-[A-Za-z0-9+/]+={0,2}$/)
+          assert.ok(Number.isSafeInteger(candidate.size) && candidate.size > 0)
+          assert.equal(registry.name, candidate.name)
+          assert.equal(registry.version, candidate.version)
+          assert.equal(registry.dist?.integrity, candidate.integrity)
+          assert.equal(registry.dist?.shasum, candidate.sha1)
+          const tarball = new URL(registry.dist?.tarball)
+          assert.equal(tarball.origin, "https://registry.npmjs.org")
+          assert.equal(tarball.search, "")
+          assert.equal(tarball.hash, "")
+          NODE
+
+          tagged=0
+          for attempt in $(seq 1 24); do
+            if npm view "${package}" dist-tags --json > "${tags}" 2>/dev/null &&
+              CANDIDATE="${candidate}" REGISTRY_TAGS="${tags}" \
+                node --input-type=module <<'NODE'
+          import { readFileSync } from "node:fs"
+
+          const candidate = JSON.parse(
+            readFileSync(process.env.CANDIDATE, "utf8"),
+          )
+          const tags = JSON.parse(
+            readFileSync(process.env.REGISTRY_TAGS, "utf8"),
+          )
+          process.exit(tags.next === candidate.version ? 0 : 1)
+          NODE
+            then
+              tagged=1
+              break
+            fi
+            echo "Waiting for next to point to ${spec} (${attempt}/24)."
+            sleep 5
+          done
+          if [[ "${tagged}" != "1" ]]; then
+            echo "The next dist-tag did not converge to ${spec} within 120 seconds." >&2
+            exit 1
+          fi
+
+          CANDIDATE="${candidate}" \
+          REGISTRY_TAGS="${tags}" \
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict"
+          import { readFileSync } from "node:fs"
+
+          const candidate = JSON.parse(
+            readFileSync(process.env.CANDIDATE, "utf8"),
+          )
+          const tags = JSON.parse(
+            readFileSync(process.env.REGISTRY_TAGS, "utf8"),
+          )
+          assert.equal(tags.next, candidate.version)
+          assert.notEqual(
+            tags.latest,
+            candidate.version,
+            "A candidate release must not update latest before registry smoke passes",
+          )
+          NODE
+
+      - name: Download and verify the exact registry tarball
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="release-candidate/candidate.json"
+          package="$(CANDIDATE="${candidate}" node -p "require('./' + process.env.CANDIDATE).name")"
+          version="$(CANDIDATE="${candidate}" node -p "require('./' + process.env.CANDIDATE).version")"
+          mkdir registry-candidate
+          npm pack "${package}@${version}" \
+            --ignore-scripts \
+            --json \
+            --pack-destination registry-candidate \
+            > "registry-evidence/registry-pack.json"
+          filename="$(PACK_JSON="registry-evidence/registry-pack.json" node -p "require('./' + process.env.PACK_JSON)[0].filename")"
+          registry_tarball="registry-candidate/${filename}"
+          test -f "${registry_tarball}"
+
+          CANDIDATE="${candidate}" \
+          PACK_JSON="registry-evidence/registry-pack.json" \
+          REGISTRY_TARBALL="${registry_tarball}" \
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict"
+          import { createHash } from "node:crypto"
+          import { lstatSync, readFileSync } from "node:fs"
+          import { basename, join } from "node:path"
+
+          const candidate = JSON.parse(
+            readFileSync(process.env.CANDIDATE, "utf8"),
+          )
+          const [packed] = JSON.parse(
+            readFileSync(process.env.PACK_JSON, "utf8"),
+          )
+          assert.equal(packed.name, candidate.name)
+          assert.equal(packed.version, candidate.version)
+          assert.equal(packed.filename, candidate.filename)
+          assert.equal(packed.filename, basename(packed.filename))
+          assert.match(packed.filename, /^[a-z0-9][a-z0-9._-]*\.tgz$/)
+          assert.equal(packed.integrity, candidate.integrity)
+          assert.equal(packed.shasum, candidate.sha1)
+          assert.equal(packed.size, candidate.size)
+
+          const registryEntry = lstatSync(process.env.REGISTRY_TARBALL)
+          assert.ok(registryEntry.isFile() && !registryEntry.isSymbolicLink())
+          assert.equal(registryEntry.nlink, 1)
+          const registryBytes = readFileSync(process.env.REGISTRY_TARBALL)
+          const candidateTarball = join(
+            "release-candidate",
+            candidate.filename,
+          )
+          const candidateEntry = lstatSync(candidateTarball)
+          assert.ok(candidateEntry.isFile() && !candidateEntry.isSymbolicLink())
+          assert.equal(candidateEntry.nlink, 1)
+          const candidateBytes = readFileSync(candidateTarball)
+          assert.equal(registryBytes.length, candidate.size)
+          assert.equal(
+            createHash("sha1").update(registryBytes).digest("hex"),
+            candidate.sha1,
+          )
+          assert.equal(
+            createHash("sha256").update(registryBytes).digest("hex"),
+            candidate.sha256,
+          )
+          assert.equal(
+            `sha512-${createHash("sha512")
+              .update(registryBytes)
+              .digest("base64")}`,
+            candidate.integrity,
+          )
+          assert.deepEqual(
+            registryBytes,
+            candidateBytes,
+            "Registry tarball bytes differ from the published candidate",
+          )
+          NODE
+
+          tar -xOf "${registry_tarball}" package/package.json \
+            > "${RUNNER_TEMP}/registry-package.json"
+          CANDIDATE="${candidate}" \
+          REGISTRY_PACKAGE="${RUNNER_TEMP}/registry-package.json" \
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict"
+          import { readFileSync } from "node:fs"
+
+          const candidate = JSON.parse(
+            readFileSync(process.env.CANDIDATE, "utf8"),
+          )
+          const packed = JSON.parse(
+            readFileSync(process.env.REGISTRY_PACKAGE, "utf8"),
+          )
+          assert.equal(packed.name, candidate.name)
+          assert.equal(packed.version, candidate.version)
+          NODE
+
+          echo "MAKEPAY_REGISTRY_TARBALL=$(realpath "${registry_tarball}")" \
+            >> "${GITHUB_ENV}"
+          echo "MAKEPAY_REGISTRY_SHA256=$(CANDIDATE="${candidate}" node -p "require('./' + process.env.CANDIDATE).sha256")" \
+            >> "${GITHUB_ENV}"
+
+          sdk_version="$(REGISTRY_PACKAGE="${RUNNER_TEMP}/registry-package.json" node -p "require(process.env.REGISTRY_PACKAGE).dependencies['@makecrypto/makepay']")"
+          mkdir registry-sdk
+          npm pack "@makecrypto/makepay@${sdk_version}" \
+            --ignore-scripts \
+            --json \
+            --pack-destination registry-sdk \
+            > "registry-evidence/registry-sdk-pack.json"
+          sdk_filename="$(PACK_JSON="registry-evidence/registry-sdk-pack.json" node -p "require('./' + process.env.PACK_JSON)[0].filename")"
+          sdk_tarball="registry-sdk/${sdk_filename}"
+          test -f "${sdk_tarball}"
+          SDK_PACK_JSON="registry-evidence/registry-sdk-pack.json" \
+          SDK_TARBALL="${sdk_tarball}" \
+          SDK_VERSION="${sdk_version}" \
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict"
+          import { createHash } from "node:crypto"
+          import { lstatSync, readFileSync } from "node:fs"
+          import { basename } from "node:path"
+
+          const [packed] = JSON.parse(
+            readFileSync(process.env.SDK_PACK_JSON, "utf8"),
+          )
+          assert.equal(packed.name, "@makecrypto/makepay")
+          assert.equal(packed.version, process.env.SDK_VERSION)
+          assert.equal(packed.filename, basename(packed.filename))
+          assert.match(packed.filename, /^[a-z0-9][a-z0-9._-]*\.tgz$/)
+          const entry = lstatSync(process.env.SDK_TARBALL)
+          assert.ok(entry.isFile() && !entry.isSymbolicLink())
+          assert.equal(entry.nlink, 1)
+          const bytes = readFileSync(process.env.SDK_TARBALL)
+          assert.equal(bytes.length, packed.size)
+          assert.equal(
+            createHash("sha1").update(bytes).digest("hex"),
+            packed.shasum,
+          )
+          assert.equal(
+            `sha512-${createHash("sha512").update(bytes).digest("base64")}`,
+            packed.integrity,
+          )
+          NODE
+          sdk_sha256="$(SDK_TARBALL="${sdk_tarball}" node -e "const {createHash}=require('node:crypto');const {readFileSync}=require('node:fs');process.stdout.write(createHash('sha256').update(readFileSync(process.env.SDK_TARBALL)).digest('hex'))")"
+          echo "MAKEPAY_REGISTRY_SDK_TARBALL=$(realpath "${sdk_tarball}")" \
+            >> "${GITHUB_ENV}"
+          echo "MAKEPAY_REGISTRY_SDK_SHA256=${sdk_sha256}" \
+            >> "${GITHUB_ENV}"
+          shasum -a 256 "${registry_tarball}" "${sdk_tarball}" \
+            > "registry-evidence/sha256sums.txt"
+
+      - name: Verify npm registry signatures and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate="release-candidate/candidate.json"
+          package="$(CANDIDATE="${candidate}" node -p "require('./' + process.env.CANDIDATE).name")"
+          version="$(CANDIDATE="${candidate}" node -p "require('./' + process.env.CANDIDATE).version")"
+          audit_root="${RUNNER_TEMP}/registry-signature-audit"
+          mkdir "${audit_root}"
+          PACKAGE_NAME="${package}" PACKAGE_VERSION="${version}" \
+            AUDIT_ROOT="${audit_root}" node --input-type=module <<'NODE'
+          import { writeFileSync } from "node:fs"
+          import { join } from "node:path"
+
+          writeFileSync(
+            join(process.env.AUDIT_ROOT, "package.json"),
+            `${JSON.stringify(
+              {
+                name: "makepay-registry-signature-audit",
+                private: true,
+                dependencies: {
+                  [process.env.PACKAGE_NAME]: process.env.PACKAGE_VERSION,
+                },
+              },
+              null,
+              2,
+            )}\n`,
+          )
+          NODE
+          (
+            cd "${audit_root}"
+            npm install \
+              --ignore-scripts \
+              --omit=peer \
+              --no-audit \
+              --no-fund
+          )
+
+          report="${GITHUB_WORKSPACE}/registry-evidence/registry-signatures.json"
+          verified=0
+          for attempt in $(seq 1 24); do
+            if (
+              cd "${audit_root}"
+              npm audit signatures \
+                --json \
+                --include-attestations
+            ) > "${report}" 2>/dev/null &&
+              TARGET_NAME="${package}" TARGET_VERSION="${version}" \
+                SIGNATURE_REPORT="${report}" node -e '
+                  const report = require(process.env.SIGNATURE_REPORT)
+                  const target = report.verified?.find(
+                    (entry) =>
+                      entry.name === process.env.TARGET_NAME &&
+                      entry.version === process.env.TARGET_VERSION,
+                  )
+                  const predicates = new Set(
+                    target?.attestationBundles?.map(
+                      (entry) => entry.predicateType,
+                    ) || [],
+                  )
+                  process.exit(
+                    target?.attestations?.provenance?.predicateType ===
+                        "https://slsa.dev/provenance/v1" &&
+                      predicates.has(
+                        "https://github.com/npm/attestation/tree/main/specs/publish/v0.1",
+                      ) &&
+                      predicates.has("https://slsa.dev/provenance/v1")
+                      ? 0
+                      : 1,
+                  )
+                '
+            then
+              verified=1
+              break
+            fi
+            echo "Waiting for ${package}@${version} attestations (${attempt}/24)."
+            sleep 5
+          done
+          if [[ "${verified}" != "1" ]]; then
+            echo "Registry signatures and provenance were not verifiable within 120 seconds." >&2
+            exit 1
+          fi
+
+          CANDIDATE="${candidate}" \
+          SIGNATURE_REPORT="${report}" \
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict"
+          import { readFileSync } from "node:fs"
+
+          const candidate = JSON.parse(
+            readFileSync(process.env.CANDIDATE, "utf8"),
+          )
+          const report = JSON.parse(
+            readFileSync(process.env.SIGNATURE_REPORT, "utf8"),
+          )
+          assert.deepEqual(report.invalid, [])
+          assert.deepEqual(report.missing, [])
+          const target = report.verified?.find(
+            (entry) =>
+              entry.name === candidate.name &&
+              entry.version === candidate.version,
+          )
+          assert.ok(target, "Published package signature was not verified")
+          assert.equal(target.registry, "https://registry.npmjs.org/")
+          assert.equal(
+            target.attestations?.provenance?.predicateType,
+            "https://slsa.dev/provenance/v1",
+          )
+          const bundles = target.attestationBundles || []
+          const predicates = new Set(
+            bundles.map((entry) => entry.predicateType),
+          )
+          assert.ok(
+            predicates.has(
+              "https://github.com/npm/attestation/tree/main/specs/publish/v0.1",
+            ),
+          )
+          assert.ok(predicates.has("https://slsa.dev/provenance/v1"))
+
+          const statements = bundles.map((entry) =>
+            JSON.parse(
+              Buffer.from(
+                entry.bundle.dsseEnvelope.payload,
+                "base64",
+              ).toString("utf8"),
+            ),
+          )
+          const expectedSha512 = Buffer.from(
+            candidate.integrity.slice("sha512-".length),
+            "base64",
+          ).toString("hex")
+          for (const statement of statements) {
+            assert.ok(
+              statement.subject?.some(
+                (subject) => subject.digest?.sha512 === expectedSha512,
+              ),
+              "Attestation subject does not bind the candidate digest",
+            )
+          }
+          const provenance = statements.find(
+            (statement) =>
+              statement.predicateType === "https://slsa.dev/provenance/v1",
+          )
+          const publication = statements.find(
+            (statement) =>
+              statement.predicateType ===
+              "https://github.com/npm/attestation/tree/main/specs/publish/v0.1",
+          )
+          assert.ok(publication, "npm publication attestation is missing")
+          assert.equal(publication.predicate?.name, candidate.name)
+          assert.equal(publication.predicate?.version, candidate.version)
+          assert.equal(
+            publication.predicate?.registry,
+            "https://registry.npmjs.org",
+          )
+          assert.ok(provenance, "SLSA provenance statement is missing")
+          const definition = provenance.predicate?.buildDefinition
+          assert.equal(
+            definition?.externalParameters?.workflow?.repository,
+            `https://github.com/${process.env.GITHUB_REPOSITORY}`,
+          )
+          assert.equal(
+            definition?.externalParameters?.workflow?.path,
+            ".github/workflows/publish.yml",
+          )
+          assert.equal(
+            definition?.externalParameters?.workflow?.ref,
+            process.env.GITHUB_REF,
+          )
+          assert.equal(
+            definition?.internalParameters?.github?.event_name,
+            process.env.GITHUB_EVENT_NAME,
+          )
+          assert.ok(
+            definition?.resolvedDependencies?.some(
+              (dependency) =>
+                dependency.digest?.gitCommit === candidate.commit,
+            ),
+            "Provenance does not bind the release commit",
+          )
+          assert.equal(
+            provenance.predicate?.runDetails?.builder?.id,
+            "https://github.com/actions/runner/github-hosted",
+          )
+          const invocation = new URL(
+            provenance.predicate?.runDetails?.metadata?.invocationId,
+          )
+          assert.equal(invocation.origin, "https://github.com")
+          const invocationPrefix =
+            `/${process.env.GITHUB_REPOSITORY}/actions/runs/` +
+            `${process.env.GITHUB_RUN_ID}/attempts/`
+          assert.ok(invocation.pathname.startsWith(invocationPrefix))
+          const publishedAttempt = invocation.pathname.slice(
+            invocationPrefix.length,
+          )
+          assert.match(publishedAttempt, /^[1-9]\d*$/)
+          assert.equal(
+            invocation.pathname,
+            `${invocationPrefix}${publishedAttempt}`,
+          )
+          assert.equal(invocation.search, "")
+          assert.equal(invocation.hash, "")
+          const verificationAttempt = Number(process.env.GITHUB_RUN_ATTEMPT)
+          assert.ok(Number.isSafeInteger(verificationAttempt))
+          assert.ok(Number(publishedAttempt) <= verificationAttempt)
+          NODE
+
+      - name: Install exact-registry smoke dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      - name: Exercise the exact registry artifact in Medusa
+        shell: bash
+        env:
+          CI: true
+          MAKEPAY_E2E_API_KEY_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5433/makepay_api_key_e2e
+          MAKEPAY_E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/makepay_medusa_e2e
+        run: |
+          set -euo pipefail
+          test -f "${MAKEPAY_REGISTRY_TARBALL}"
+          MAKEPAY_PLUGIN_TARBALL="${MAKEPAY_REGISTRY_TARBALL}" \
+          MAKEPAY_PLUGIN_TARBALL_SHA256="${MAKEPAY_REGISTRY_SHA256}" \
+          MAKEPAY_SDK_TARBALL="${MAKEPAY_REGISTRY_SDK_TARBALL}" \
+          MAKEPAY_SDK_TARBALL_SHA256="${MAKEPAY_REGISTRY_SDK_SHA256}" \
+            npm run test:e2e:medusa
+          printf 'verified %s at %s\n' \
+            "${GITHUB_REF_NAME}" \
+            "${GITHUB_SHA}" \
+            > "registry-evidence/success.txt"
+
+      - name: Upload sanitized registry-smoke runtime logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: npm-registry-verification-${{ github.ref_name }}
+          if-no-files-found: error
+          path: |
+            registry-evidence
+            output/playwright/medusa-makepay/runtime/**/*.log
+          retention-days: 90

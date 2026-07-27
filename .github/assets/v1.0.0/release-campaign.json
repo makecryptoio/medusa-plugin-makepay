@@ -1,0 +1,71 @@
+{
+  "acceptanceDigest": "2a598492a7e5807d57dd184a9a77575e32dddc1a52321b48f685413941cb88a1",
+  "acceptedAt": "2026-07-27T10:05:32.579Z",
+  "artifactProvenance": {
+    "plugin": {
+      "sha256": "f89250fe8f2bb90c9be381496d171da7f864598d32719518c6f3b99e044d775c",
+      "version": "1.0.0"
+    },
+    "sdk": {
+      "sha256": "b597fc487f3be8829655505d5bbc2966eb02b80421ca6cf8a57d9a507d324672",
+      "version": "0.4.0"
+    }
+  },
+  "cleanupReceipt": {
+    "method": "guarded-production-reset",
+    "path": "campaign/cleanup-receipt.json",
+    "sha256": "31074162aeedc8cc00c32037e43c0bab86c628092a902216380e3566a0d91517"
+  },
+  "deterministicRun": {
+    "manifest": {
+      "path": "campaign/deterministic/manifest.json",
+      "sha256": "d9ae608e468208c977ad4498f6a43c5b18822d4354c32acf07da996419bb4b97"
+    }
+  },
+  "evidenceDigest": "a644e5c9fbfb1bfb4aeec33a325fd0c733b612267debfce10991db934d40da8d",
+  "realRun": {
+    "artifacts": [
+      {
+        "path": "campaign/real-08-59/backend.log",
+        "sha256": "56075fd715d7dcbe7c6f35473094511d4d1e9064c49bd7edca89c34bf8dd1678",
+        "role": "real-backend-a-log"
+      },
+      {
+        "path": "campaign/real-08-59/backend-installation-b.log",
+        "sha256": "76265bb76fb47c05131cffe56c58dcdac0febaf521d3c2da32b9af71234f95a0",
+        "role": "real-backend-b-log"
+      },
+      {
+        "path": "campaign/real-08-59/old-installation-b-signer.log",
+        "sha256": "3ea87e78f6d834e542293249d4450d1b1db95e8de23ecf05ef0c70186bd6ecea",
+        "role": "old-signer-failure-log"
+      },
+      {
+        "path": "campaign/real-08-59/real-sandbox.spec.mjs",
+        "sha256": "ad2705bafd54bbd78641a1ce84dc3cd57490899bb132d223a1372d2fb4850076",
+        "role": "real-sandbox-spec-source"
+      },
+      {
+        "path": "campaign/real-08-59/real-sandbox-event-helper.mjs",
+        "sha256": "1fe13c91e0525bc506e4c4de77c075d51f24a601d19496a13df64ffc66ec5949",
+        "role": "real-sandbox-event-helper-source"
+      },
+      {
+        "path": "campaign/real-08-59/start-old-signer-pre-fix.txt",
+        "sha256": "af641120727ef63692090fdf1c6efd188f6944b72ff201bcb2eb98d4d4a215b3",
+        "role": "old-signer-start-source"
+      }
+    ],
+    "completed": false,
+    "failure": "test-harness-old-signer-socket-race",
+    "lastVerifiedCheckpoint": "cross-installation-webhook-isolation",
+    "manifest": {
+      "path": "manifest.json",
+      "sha256": "577bcde3c79c942a91d8681aed81cfbb42adf39240ca5d5f5d7c45ad1dafe612"
+    }
+  },
+  "releaseVersion": "1.0.0",
+  "reviewer": "OpenAI Codex",
+  "schemaVersion": 1,
+  "strategy": "cumulative-real-plus-deterministic"
+}

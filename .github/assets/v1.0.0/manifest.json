@@ -1,0 +1,300 @@
+{
+  "approvedOrigins": {
+    "backend": "https://marketplace-concern-wisdom-accommodations.trycloudflare.com",
+    "checkout": "https://www.makepay.io"
+  },
+  "artifactProvenance": {
+    "plugin": {
+      "sha256": "f89250fe8f2bb90c9be381496d171da7f864598d32719518c6f3b99e044d775c",
+      "version": "1.0.0"
+    },
+    "sdk": {
+      "sha256": "b597fc487f3be8829655505d5bbc2966eb02b80421ca6cf8a57d9a507d324672",
+      "version": "0.4.0"
+    }
+  },
+  "completionAttestation": null,
+  "correlation": {
+    "amount": "20",
+    "checkoutPath": "/payment/06ft5maz2m8zegw7hfb4n0mss6",
+    "companyId": "43121549-6a75-44eb-a6a3-3527215c1d96",
+    "currency": "EUR",
+    "customerEmail": "makepay-real-sandbox+medusa-e2e-2026-07-27t08-59-45-191z-184868869b5e3f12@example.com",
+    "medusaStatus": "pending_authorization",
+    "orderId": "order_01KYHD39AMPYD03N94R7ATFRSR",
+    "paymentLinkUid": "06ft5maz2m8zegw7hfb4n0mss6",
+    "providerStatus": "active"
+  },
+  "evidence": [
+    {
+      "artifactProvenance": {
+        "plugin": {
+          "sha256": "f89250fe8f2bb90c9be381496d171da7f864598d32719518c6f3b99e044d775c",
+          "version": "1.0.0"
+        },
+        "sdk": {
+          "sha256": "b597fc487f3be8829655505d5bbc2966eb02b80421ca6cf8a57d9a507d324672",
+          "version": "0.4.0"
+        }
+      },
+      "capturedAt": "2026-07-27T09:05:00.390Z",
+      "correlation": {
+        "amount": "20",
+        "checkoutPath": "/payment/06ft5maz2m8zegw7hfb4n0mss6",
+        "companyId": "43121549-6a75-44eb-a6a3-3527215c1d96",
+        "currency": "EUR",
+        "customerEmail": "makepay-real-sandbox+medusa-e2e-2026-07-27t08-59-45-191z-184868869b5e3f12@example.com",
+        "medusaStatus": "pending_authorization",
+        "orderId": "order_01KYHD39AMPYD03N94R7ATFRSR",
+        "paymentLinkUid": "06ft5maz2m8zegw7hfb4n0mss6",
+        "providerStatus": "active"
+      },
+      "docsReview": {
+        "reviewedAt": "2026-07-27T10:35:44.598Z",
+        "reviewedSha256": "b3d8e02c2a593b6942606f964fef8bd4304d31a595ce84800899e3f5345cddf1",
+        "reviewer": "OpenAI Codex",
+        "status": "approved",
+        "caption": "MakePay sandbox hosted checkout opened from the Medusa storefront order flow.",
+        "publishedImage": "/images/documentation/apps/medusa/makepay-sandbox-checkout.png",
+        "publishedImageSha256": "b3d8e02c2a593b6942606f964fef8bd4304d31a595ce84800899e3f5345cddf1",
+        "receiptDocument": "review-artifacts/docs-makepay-sandbox-checkout-receipt.json",
+        "receiptSha256": "f21d8271a74d4f0db834f2a18c6d168c037f0ae026a3bc2e424f97636c75410c",
+        "renderedDocument": "review-artifacts/docs-makepay-sandbox-checkout.png",
+        "renderedSha256": "15ccb9444dd85941bf86a9c415df042b5730c11af1c93e2b8e03cc08e7a585b8",
+        "sourceFilename": "makepay-sandbox-checkout.png",
+        "sourceSha256": "b3d8e02c2a593b6942606f964fef8bd4304d31a595ce84800899e3f5345cddf1"
+      },
+      "expectedPath": "/payment/06ft5maz2m8zegw7hfb4n0mss6",
+      "filename": "makepay-sandbox-checkout.png",
+      "mode": "real-sandbox",
+      "origin": "https://www.makepay.io",
+      "pathname": "/payment/06ft5maz2m8zegw7hfb4n0mss6",
+      "requiredTestIds": [],
+      "requiredTexts": [
+        "/sandbox mode/i",
+        "/do not send real funds/i",
+        "/20(?:\\.0+)?\\s*EUR|EUR\\s*20(?:\\.0+)?/i"
+      ],
+      "runId": "medusa-e2e-2026-07-27T08-59-45-191Z-184868869b5e3f12",
+      "sha256": "b3d8e02c2a593b6942606f964fef8bd4304d31a595ce84800899e3f5345cddf1",
+      "title": "MakePay | Self-Custody Crypto Payment Gateway",
+      "url": "https://www.makepay.io/payment/06ft5maz2m8zegw7hfb4n0mss6",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "visualReview": {
+        "reviewedAt": "2026-07-27T10:10:30.382Z",
+        "reviewedSha256": "b3d8e02c2a593b6942606f964fef8bd4304d31a595ce84800899e3f5345cddf1",
+        "reviewer": "OpenAI Codex",
+        "status": "approved"
+      }
+    },
+    {
+      "artifactProvenance": {
+        "plugin": {
+          "sha256": "f89250fe8f2bb90c9be381496d171da7f864598d32719518c6f3b99e044d775c",
+          "version": "1.0.0"
+        },
+        "sdk": {
+          "sha256": "b597fc487f3be8829655505d5bbc2966eb02b80421ca6cf8a57d9a507d324672",
+          "version": "0.4.0"
+        }
+      },
+      "capturedAt": "2026-07-27T09:05:02.271Z",
+      "correlation": {
+        "amount": "20",
+        "checkoutPath": "/payment/06ft5maz2m8zegw7hfb4n0mss6",
+        "companyId": "43121549-6a75-44eb-a6a3-3527215c1d96",
+        "currency": "EUR",
+        "customerEmail": "makepay-real-sandbox+medusa-e2e-2026-07-27t08-59-45-191z-184868869b5e3f12@example.com",
+        "medusaStatus": "pending_authorization",
+        "orderId": "order_01KYHD39AMPYD03N94R7ATFRSR",
+        "paymentLinkUid": "06ft5maz2m8zegw7hfb4n0mss6",
+        "providerStatus": "active"
+      },
+      "docsReview": {
+        "reviewedAt": "2026-07-27T10:35:42.667Z",
+        "reviewedSha256": "4fa1b8503e3b7e06574d244e3482e1fe9cbc6bcca4cf75b5184d2138ff53d4c5",
+        "reviewer": "OpenAI Codex",
+        "status": "approved",
+        "caption": "Medusa Admin MakePay settings connected to a sandbox company with OAuth and installation webhook health.",
+        "publishedImage": "/images/documentation/apps/medusa/connected-makepay-settings.png",
+        "publishedImageSha256": "4fa1b8503e3b7e06574d244e3482e1fe9cbc6bcca4cf75b5184d2138ff53d4c5",
+        "receiptDocument": "review-artifacts/docs-connected-makepay-settings-receipt.json",
+        "receiptSha256": "6772aeb1e0fbca0e278a201d2109bf32545f7036b18aad9e27d81a80014e5cba",
+        "renderedDocument": "review-artifacts/docs-connected-makepay-settings.png",
+        "renderedSha256": "d141e8a6f226601fdfd4081f8005517ca515340a64f3d6c04a3ffc03979a41b4",
+        "sourceFilename": "connected-makepay-settings.png",
+        "sourceSha256": "4fa1b8503e3b7e06574d244e3482e1fe9cbc6bcca4cf75b5184d2138ff53d4c5"
+      },
+      "expectedPath": "/app/settings/makepay",
+      "filename": "connected-makepay-settings.png",
+      "mode": "real-sandbox",
+      "origin": "https://marketplace-concern-wisdom-accommodations.trycloudflare.com",
+      "pathname": "/app/settings/makepay",
+      "requiredTestIds": [
+        "makepay-settings-page"
+      ],
+      "requiredTexts": [
+        "MakePay",
+        "Disconnect",
+        "Demo shop",
+        "MakeCrypto OAuth",
+        "Healthy"
+      ],
+      "runId": "medusa-e2e-2026-07-27T08-59-45-191Z-184868869b5e3f12",
+      "sha256": "4fa1b8503e3b7e06574d244e3482e1fe9cbc6bcca4cf75b5184d2138ff53d4c5",
+      "title": "Settings - Medusa",
+      "url": "https://marketplace-concern-wisdom-accommodations.trycloudflare.com/app/settings/makepay",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "visualReview": {
+        "reviewedAt": "2026-07-27T10:10:29.565Z",
+        "reviewedSha256": "4fa1b8503e3b7e06574d244e3482e1fe9cbc6bcca4cf75b5184d2138ff53d4c5",
+        "reviewer": "OpenAI Codex",
+        "status": "approved"
+      }
+    },
+    {
+      "artifactProvenance": {
+        "plugin": {
+          "sha256": "f89250fe8f2bb90c9be381496d171da7f864598d32719518c6f3b99e044d775c",
+          "version": "1.0.0"
+        },
+        "sdk": {
+          "sha256": "b597fc487f3be8829655505d5bbc2966eb02b80421ca6cf8a57d9a507d324672",
+          "version": "0.4.0"
+        }
+      },
+      "capturedAt": "2026-07-27T09:05:04.059Z",
+      "correlation": {
+        "amount": "20",
+        "checkoutPath": "/payment/06ft5maz2m8zegw7hfb4n0mss6",
+        "companyId": "43121549-6a75-44eb-a6a3-3527215c1d96",
+        "currency": "EUR",
+        "customerEmail": "makepay-real-sandbox+medusa-e2e-2026-07-27t08-59-45-191z-184868869b5e3f12@example.com",
+        "medusaStatus": "pending_authorization",
+        "orderId": "order_01KYHD39AMPYD03N94R7ATFRSR",
+        "paymentLinkUid": "06ft5maz2m8zegw7hfb4n0mss6",
+        "providerStatus": "active"
+      },
+      "docsReview": {
+        "reviewedAt": "2026-07-27T10:35:43.381Z",
+        "reviewedSha256": "55194eba53ae6fa243fd6b73516779015470e337d47b8598d8e9aefe96db7d87",
+        "reviewer": "OpenAI Codex",
+        "status": "approved",
+        "caption": "Medusa Admin MakePay payment list showing the installation-scoped local payment projection.",
+        "publishedImage": "/images/documentation/apps/medusa/makepay-payments-list.png",
+        "publishedImageSha256": "55194eba53ae6fa243fd6b73516779015470e337d47b8598d8e9aefe96db7d87",
+        "receiptDocument": "review-artifacts/docs-makepay-payments-list-receipt.json",
+        "receiptSha256": "2104c6cf07a93a7623869c8920c030342a7d461e3ef5041425deb935d20ad579",
+        "renderedDocument": "review-artifacts/docs-makepay-payments-list.png",
+        "renderedSha256": "c321ca83b0083640de585954e5a0d2b6fc1268e7b7815f1918d3311d95186591",
+        "sourceFilename": "makepay-payments-list.png",
+        "sourceSha256": "55194eba53ae6fa243fd6b73516779015470e337d47b8598d8e9aefe96db7d87"
+      },
+      "expectedPath": "/app/makepay",
+      "filename": "makepay-payments-list.png",
+      "mode": "real-sandbox",
+      "origin": "https://marketplace-concern-wisdom-accommodations.trycloudflare.com",
+      "pathname": "/app/makepay",
+      "requiredTestIds": [
+        "makepay-payments-page",
+        "makepay-sidebar-logo"
+      ],
+      "requiredTexts": [
+        "MakePay payments",
+        "06ft5maz2m8zegw7hfb4n0mss6",
+        "makepay-real-sandbox+medusa-e2e-2026-07-27t08-59-45-191z-184868869b5e3f12@example.com",
+        "/€20\\.00|EUR 20(?:\\.00)?|20(?:\\.00)? €/"
+      ],
+      "runId": "medusa-e2e-2026-07-27T08-59-45-191Z-184868869b5e3f12",
+      "sha256": "55194eba53ae6fa243fd6b73516779015470e337d47b8598d8e9aefe96db7d87",
+      "title": "Medusa",
+      "url": "https://marketplace-concern-wisdom-accommodations.trycloudflare.com/app/makepay",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "visualReview": {
+        "reviewedAt": "2026-07-27T10:10:29.841Z",
+        "reviewedSha256": "55194eba53ae6fa243fd6b73516779015470e337d47b8598d8e9aefe96db7d87",
+        "reviewer": "OpenAI Codex",
+        "status": "approved"
+      }
+    },
+    {
+      "artifactProvenance": {
+        "plugin": {
+          "sha256": "f89250fe8f2bb90c9be381496d171da7f864598d32719518c6f3b99e044d775c",
+          "version": "1.0.0"
+        },
+        "sdk": {
+          "sha256": "b597fc487f3be8829655505d5bbc2966eb02b80421ca6cf8a57d9a507d324672",
+          "version": "0.4.0"
+        }
+      },
+      "capturedAt": "2026-07-27T09:05:07.163Z",
+      "correlation": {
+        "amount": "20",
+        "checkoutPath": "/payment/06ft5maz2m8zegw7hfb4n0mss6",
+        "companyId": "43121549-6a75-44eb-a6a3-3527215c1d96",
+        "currency": "EUR",
+        "customerEmail": "makepay-real-sandbox+medusa-e2e-2026-07-27t08-59-45-191z-184868869b5e3f12@example.com",
+        "medusaStatus": "pending_authorization",
+        "orderId": "order_01KYHD39AMPYD03N94R7ATFRSR",
+        "paymentLinkUid": "06ft5maz2m8zegw7hfb4n0mss6",
+        "providerStatus": "active"
+      },
+      "docsReview": {
+        "reviewedAt": "2026-07-27T10:35:43.984Z",
+        "reviewedSha256": "ad855dbe9cf159d0d7399700fa806cafd88bec1246f8ee5550232f862bf8e753",
+        "reviewer": "OpenAI Codex",
+        "status": "approved",
+        "caption": "Medusa order details showing the MakePay payment widget and read-only reconciliation controls.",
+        "publishedImage": "/images/documentation/apps/medusa/makepay-order-widget.png",
+        "publishedImageSha256": "ad855dbe9cf159d0d7399700fa806cafd88bec1246f8ee5550232f862bf8e753",
+        "receiptDocument": "review-artifacts/docs-makepay-order-widget-receipt.json",
+        "receiptSha256": "e5ae46582c8bbb0aa9c25fe8193630986129a4954742123c384b72628072dcd4",
+        "renderedDocument": "review-artifacts/docs-makepay-order-widget.png",
+        "renderedSha256": "514ecf27f8ca99a4605d37afab87fa51d17e9501ffad15c35ec1bbb8438c7961",
+        "sourceFilename": "makepay-order-widget.png",
+        "sourceSha256": "ad855dbe9cf159d0d7399700fa806cafd88bec1246f8ee5550232f862bf8e753"
+      },
+      "expectedPath": "/app/orders/order_01KYHD39AMPYD03N94R7ATFRSR",
+      "filename": "makepay-order-widget.png",
+      "mode": "real-sandbox",
+      "origin": "https://marketplace-concern-wisdom-accommodations.trycloudflare.com",
+      "pathname": "/app/orders/order_01KYHD39AMPYD03N94R7ATFRSR",
+      "requiredTestIds": [
+        "makepay-order-widget"
+      ],
+      "requiredTexts": [
+        "MakePay",
+        "06ft5maz2m8zegw7hfb4n0mss6",
+        "/€20\\.00|EUR 20(?:\\.00)?|20(?:\\.00)? €/",
+        "/automated refunds aren.t supported/i"
+      ],
+      "runId": "medusa-e2e-2026-07-27T08-59-45-191Z-184868869b5e3f12",
+      "sha256": "ad855dbe9cf159d0d7399700fa806cafd88bec1246f8ee5550232f862bf8e753",
+      "title": "#1 - Medusa",
+      "url": "https://marketplace-concern-wisdom-accommodations.trycloudflare.com/app/orders/order_01KYHD39AMPYD03N94R7ATFRSR",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "visualReview": {
+        "reviewedAt": "2026-07-27T10:10:30.111Z",
+        "reviewedSha256": "ad855dbe9cf159d0d7399700fa806cafd88bec1246f8ee5550232f862bf8e753",
+        "reviewer": "OpenAI Codex",
+        "status": "approved"
+      }
+    }
+  ],
+  "mode": "real-sandbox",
+  "runId": "medusa-e2e-2026-07-27T08-59-45-191Z-184868869b5e3f12",
+  "schemaVersion": 3
+}

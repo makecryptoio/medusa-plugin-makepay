@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "createMedusaAppVersion": "2.17.2",
+  "createMedusaAppIntegrity": "sha512-+03OPgtswORKGrtjYJyUQEvFEJqfdyNbDDl/SccPDrv1FqwAA0ASKchWW0aJ1FT42U+xMSpTIeDNSdvwOTWhdg==",
+  "createMedusaAppShasum": "ec69a9794da4b39544f634b346d2e545738d47c9",
+  "repository": "https://github.com/medusajs/dtc-starter.git",
+  "commit": "9233262ff1f04185646f88362918c027e1431cd6",
+  "tree": "27dec6fba7107e0a57b238e3f1bc5f3c939ec1d4",
+  "packageLockSha256": "8bf5e2e52f85afe5a60166b27cc6740a52e87983e7bcd91fe4af4e3c2fba4e82"
+}

@@ -1,0 +1,47 @@
+  const startOldSigner = async () => {
+    if (oldSigner?.child?.exitCode === null) {
+      throw new Error("The old installation-B signer is already active.");
+    }
+    const target = installation("b");
+    const signerId = randomUUID().replaceAll("-", "");
+    const signerSocketPath = join(
+      temporaryRoot,
+      `old-b-signer-${signerId}.sock`,
+    );
+    registerRuntimeSecret(signerSocketPath);
+    const inputPath = join(fixtureDirectory, `signer-${signerId}.json`);
+    const outputPath = join(fixtureDirectory, `signer-${signerId}.ready.json`);
+    registerRuntimeSecret(inputPath);
+    registerRuntimeSecret(outputPath);
+    await writeRestrictedJson(inputPath, {
+      action: "serve-signer",
+      callbackUrl: target.callbackUrl,
+      socketPath: signerSocketPath,
+    });
+    const child = await startProcess(
+      "npx",
+      ["--no-install", "medusa", "exec", helperPath, inputPath, outputPath],
+      {
+        cwd: target.backendRoot,
+        env: target.env,
+        logPath: join(
+          temporaryRoot,
+          "runtime-raw",
+          "old-installation-b-signer.log",
+        ),
+        mutator: true,
+      },
+    );
+    oldSigner = {
+      child,
+      inputPath,
+      outputPath,
+      socketPath: signerSocketPath,
+    };
+    await waitForSocket(signerSocketPath, child, "Old installation-B signer");
+    await Promise.all([
+      rm(inputPath, { force: true }),
+      rm(outputPath, { force: true }),
+    ]);
+    return { ready: true };
+  };
