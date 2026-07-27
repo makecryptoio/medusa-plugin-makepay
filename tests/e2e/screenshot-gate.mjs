@@ -16,6 +16,9 @@ import {
   validateEvidenceReview,
   validateEvidenceRunCompletion,
 } from "./support/evidence.mjs";
+import {
+  loadReleaseEvidenceCampaign,
+} from "./support/release-evidence-campaign.mjs";
 
 const filenames = [
   "connected-makepay-settings.png",
@@ -140,6 +143,7 @@ const allowedArguments = new Set([
   "approve-docs",
   "approve-visual",
   "backend-origin",
+  "campaign",
   "check",
   "checkout-origin",
   "docs-receipt",
@@ -688,6 +692,7 @@ async function validateOfficialDocumentationPublication(manifest) {
 }
 
 async function loadDocumentationReceipt({
+  completionBinding,
   entry,
   manifest,
   manifestPath,
@@ -733,8 +738,7 @@ async function loadDocumentationReceipt({
     receipt.responseContentType !== "image/png" ||
     receipt.responseSha256 !== entry.sha256 ||
     receipt.manifestRunId !== manifest.runId ||
-    receipt.manifestEvidenceDigest !==
-      manifest.completionAttestation?.evidenceDigest ||
+    receipt.manifestEvidenceDigest !== completionBinding.evidenceDigest ||
     !/^[a-f0-9]{64}$/.test(receipt.docsSourceSha256) ||
     !/^[a-f0-9]{64}$/.test(receipt.renderedSha256) ||
     receipt.viewport.width !== 1440 ||
@@ -779,16 +783,22 @@ async function loadDocumentationReceipt({
   };
 }
 
-async function validateDocumentationBinding(entry, manifest, manifestPath) {
+async function validateDocumentationBinding(
+  entry,
+  manifest,
+  manifestPath,
+  completionBinding,
+) {
   if (entry.docsReview?.status !== "approved") return;
   const expected = documentationEvidence.get(entry.filename);
   const receipt = await loadDocumentationReceipt({
+    completionBinding,
     entry,
     manifest,
     manifestPath,
     receiptDocument: entry.docsReview.receiptDocument,
   });
-  const acceptedAt = new Date(manifest.completionAttestation?.acceptedAt);
+  const acceptedAt = new Date(completionBinding.acceptedAt);
   const visualReviewedAt = new Date(entry.visualReview?.reviewedAt);
   const docsReviewedAt = new Date(entry.docsReview.reviewedAt);
   if (
@@ -919,7 +929,12 @@ async function main() {
       "Release evidence requires --published-root for current MakeCrypto source and image revalidation.",
     );
   }
-  validateEvidenceRunCompletion(manifest);
+  const completionBinding = args.campaign
+    ? await loadReleaseEvidenceCampaign({
+        campaignPath: resolve(args.campaign),
+        manifestPath,
+      })
+    : validateEvidenceRunCompletion(manifest);
 
   let releaseProvenance = null;
   if (args.check === "release") {
@@ -1141,7 +1156,12 @@ async function main() {
         );
       }
     }
-    await validateDocumentationBinding(entry, manifest, manifestPath);
+    await validateDocumentationBinding(
+      entry,
+      manifest,
+      manifestPath,
+      completionBinding,
+    );
   }
   if (new Set(sourcePixelHashes).size !== filenames.length) {
     throw new Error(
@@ -1225,6 +1245,7 @@ async function main() {
         ).replaceAll("\\", "/"),
       );
       const receipt = await loadDocumentationReceipt({
+        completionBinding,
         entry: selected,
         manifest,
         manifestPath,
@@ -1263,7 +1284,12 @@ async function main() {
         sourceSha256: selected.sha256,
       };
       validateEvidenceReview(selected.docsReview, "docs");
-      await validateDocumentationBinding(selected, manifest, manifestPath);
+      await validateDocumentationBinding(
+        selected,
+        manifest,
+        manifestPath,
+        completionBinding,
+      );
     }
     await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   }
@@ -1296,6 +1322,7 @@ async function main() {
         expected,
       );
       const documentationBinding = await loadDocumentationReceipt({
+        completionBinding,
         entry,
         manifest,
         manifestPath,

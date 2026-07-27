@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { captureEvidence } from "./support/evidence.mjs";
+import { selectPurchasableProductOptions } from "./support/storefront-product-options.mjs";
 
 const backendUrl = process.env.MAKEPAY_E2E_BACKEND_URL;
 const secondBackendUrl = process.env.MAKEPAY_E2E_SECOND_BACKEND_URL;
@@ -521,14 +522,6 @@ async function assertPackedWebhookRouteBoundaries(request) {
   expect(oversized.status()).toBe(413);
 }
 
-async function selectFirstVariant(page) {
-  const groups = page.getByTestId("product-options");
-  const count = await groups.count();
-  for (let index = 0; index < count; index += 1) {
-    await groups.nth(index).getByTestId("option-button").first().click();
-  }
-}
-
 const buyerEmail = (scenario) =>
   `makepay-medusa-e2e+${runId}-${scenario}@example.com`.toLowerCase();
 
@@ -797,13 +790,18 @@ async function completeStorefrontCheckout(
       .filter({ hasText: "Medusa T-Shirt" })
       .first(),
   ).toBeVisible();
-  await selectFirstVariant(page);
-  const productUrl = page.url();
+  await selectPurchasableProductOptions(page);
+  const productEndpoint = new URL(page.url());
   const [addToCartResponse] = await Promise.all([
     page.waitForResponse(
-      (response) =>
-        response.request().method() === "POST" &&
-        response.url().split("?")[0] === productUrl,
+      (response) => {
+        const responseUrl = new URL(response.url());
+        return (
+          response.request().method() === "POST" &&
+          responseUrl.origin === productEndpoint.origin &&
+          responseUrl.pathname === productEndpoint.pathname
+        );
+      },
     ),
     page.getByTestId("add-product-button").click(),
   ]);

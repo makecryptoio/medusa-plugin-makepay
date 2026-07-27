@@ -404,7 +404,7 @@ function completionEvidenceEntry(entry) {
   return immutable;
 }
 
-function evidenceCompletionDigest(manifest) {
+export function evidenceCompletionDigest(manifest) {
   const payload = canonicalize({
     approvedOrigins: manifest.approvedOrigins || {},
     artifactProvenance: manifest.artifactProvenance,
@@ -419,6 +419,49 @@ function evidenceCompletionDigest(manifest) {
     schemaVersion: manifest.schemaVersion,
   });
   return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
+}
+
+export function validatePendingRealSandboxEvidenceManifest(manifest) {
+  if (
+    !manifest ||
+    manifest.schemaVersion !== evidenceSchemaVersion ||
+    manifest.mode !== "real-sandbox" ||
+    typeof manifest.runId !== "string" ||
+    !manifest.runId ||
+    !Array.isArray(manifest.evidence) ||
+    !manifest.evidence.length ||
+    manifest.completionAttestation !== null
+  ) {
+    throw new Error(
+      "Cumulative release evidence requires an unattested real-sandbox manifest.",
+    );
+  }
+  validateRealSandboxManifestShape(manifest);
+  const provenance = validateArtifactProvenance(
+    manifest.artifactProvenance,
+    "Pending real-sandbox evidence artifact provenance",
+  );
+  validateCanonicalEvidenceUrls(manifest);
+  for (const entry of manifest.evidence) {
+    const capturedAt = new Date(entry.capturedAt);
+    if (
+      entry.mode !== manifest.mode ||
+      entry.runId !== manifest.runId ||
+      !artifactProvenanceEquals(entry.artifactProvenance, provenance) ||
+      Number.isNaN(capturedAt.getTime()) ||
+      capturedAt.toISOString() !== entry.capturedAt
+    ) {
+      throw new Error(
+        `Pending real-sandbox evidence entry is invalid (${entry.filename}).`,
+      );
+    }
+  }
+  return {
+    evidenceDigest: evidenceCompletionDigest(manifest),
+    artifactProvenance: provenance,
+    mode: manifest.mode,
+    runId: manifest.runId,
+  };
 }
 
 function validateCanonicalEvidenceUrls(manifest) {

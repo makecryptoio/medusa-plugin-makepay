@@ -43,6 +43,8 @@ import {
   validateRealSandboxPlaywrightReport,
 } from "../tests/e2e/support/evidence.mjs";
 import { patchOfficialStorefront } from "../tests/e2e/support/patch-storefront.mjs";
+import { extractCreatedQuickTunnelUrl } from "../tests/e2e/support/quick-tunnel.mjs";
+import { createRestrictedSocketAddress } from "../tests/e2e/support/restricted-socket.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const officialMedusaFixtureRoot = join(
@@ -3063,18 +3065,29 @@ async function startQuickTunnel(port, root, name) {
   }
   const logPath = join(temporaryRoot, "runtime-raw", `${name}-tunnel.log`);
   let publicUrl;
+  let tunnelOutput = "";
   const child = await startProcess(
     "cloudflared",
-    ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${port}`],
+    [
+      "tunnel",
+      "--no-autoupdate",
+      "--edge-ip-version",
+      "4",
+      "--protocol",
+      "http2",
+      "--url",
+      `http://127.0.0.1:${port}`,
+    ],
     {
       cwd: root,
       env: {},
       inspectOutput: (value) => {
-        const match = stripVTControlCharacters(value).match(
-          /https:\/\/[a-z0-9-]+\.trycloudflare\.com/i,
+        tunnelOutput = `${tunnelOutput}${stripVTControlCharacters(value)}`.slice(
+          -16_384,
         );
-        if (match && !publicUrl) {
-          publicUrl = match[0];
+        const generatedUrl = extractCreatedQuickTunnelUrl(tunnelOutput);
+        if (generatedUrl && !publicUrl) {
+          publicUrl = generatedUrl;
           registerRuntimeSecret(publicUrl);
         }
       },
@@ -3638,22 +3651,9 @@ async function stopChild(child) {
 }
 
 async function listenOnRestrictedControlSocket(server, name) {
-  // Unix-domain socket paths are limited to roughly 104 bytes on macOS. The
-  // E2E workspace can intentionally live under a long, persistent TMPDIR, so
-  // keep only the ephemeral control socket in a short, private /tmp leaf.
-  const socketBase = process.platform === "win32" ? tmpdir() : "/tmp";
-  const socketDirectory = await mkdtemp(join(socketBase, "mpe2e-"));
+  const { socketDirectory, socketPath } =
+    await createRestrictedSocketAddress(name);
   registerRuntimeSecret(socketDirectory);
-  await chmod(socketDirectory, 0o700);
-  const directoryEntry = await lstat(socketDirectory);
-  assertOwner(directoryEntry, "The E2E control-socket directory");
-  if (!directoryEntry.isDirectory() || directoryEntry.isSymbolicLink()) {
-    await rm(socketDirectory, { force: true, recursive: true });
-    throw new Error(
-      "The E2E control-socket directory is not a private directory.",
-    );
-  }
-  const socketPath = join(await realpath(socketDirectory), `${name}.sock`);
   registerRuntimeSecret(socketPath);
   try {
     await new Promise((resolvePromise, reject) => {
@@ -3992,46 +3992,60 @@ async function startRealSandboxControl({ installations }) {
     }
     const target = installation("b");
     const signerId = randomUUID().replaceAll("-", "");
-    const signerSocketPath = join(
-      temporaryRoot,
-      `old-b-signer-${signerId}.sock`,
-    );
+    const {
+      socketDirectory: signerSocketDirectory,
+      socketPath: signerSocketPath,
+    } = await createRestrictedSocketAddress("old-b");
+    registerRuntimeSecret(signerSocketDirectory);
     registerRuntimeSecret(signerSocketPath);
     const inputPath = join(fixtureDirectory, `signer-${signerId}.json`);
     const outputPath = join(fixtureDirectory, `signer-${signerId}.ready.json`);
     registerRuntimeSecret(inputPath);
     registerRuntimeSecret(outputPath);
-    await writeRestrictedJson(inputPath, {
-      action: "serve-signer",
-      callbackUrl: target.callbackUrl,
-      socketPath: signerSocketPath,
-    });
-    const child = await startProcess(
-      "npx",
-      ["--no-install", "medusa", "exec", helperPath, inputPath, outputPath],
-      {
-        cwd: target.backendRoot,
-        env: target.env,
-        logPath: join(
-          temporaryRoot,
-          "runtime-raw",
-          "old-installation-b-signer.log",
-        ),
-        mutator: true,
-      },
-    );
-    oldSigner = {
-      child,
-      inputPath,
-      outputPath,
-      socketPath: signerSocketPath,
-    };
-    await waitForSocket(signerSocketPath, child, "Old installation-B signer");
-    await Promise.all([
-      rm(inputPath, { force: true }),
-      rm(outputPath, { force: true }),
-    ]);
-    return { ready: true };
+    let child;
+    try {
+      await writeRestrictedJson(inputPath, {
+        action: "serve-signer",
+        callbackUrl: target.callbackUrl,
+        socketPath: signerSocketPath,
+      });
+      child = await startProcess(
+        "npx",
+        ["--no-install", "medusa", "exec", helperPath, inputPath, outputPath],
+        {
+          cwd: target.backendRoot,
+          env: target.env,
+          logPath: join(
+            temporaryRoot,
+            "runtime-raw",
+            "old-installation-b-signer.log",
+          ),
+          mutator: true,
+        },
+      );
+      oldSigner = {
+        child,
+        inputPath,
+        outputPath,
+        socketDirectory: signerSocketDirectory,
+        socketPath: signerSocketPath,
+      };
+      await waitForSocket(signerSocketPath, child, "Old installation-B signer");
+      await Promise.all([
+        rm(inputPath, { force: true }),
+        rm(outputPath, { force: true }),
+      ]);
+      return { ready: true };
+    } catch (error) {
+      await stopChild(child).catch(() => {});
+      await Promise.all([
+        rm(inputPath, { force: true }),
+        rm(outputPath, { force: true }),
+        rm(signerSocketDirectory, { force: true, recursive: true }),
+      ]);
+      oldSigner = undefined;
+      throw error;
+    }
   };
 
   const handler = async (input) => {
@@ -4121,8 +4135,11 @@ async function startRealSandboxControl({ installations }) {
     }
     if (action === "stop-old-b-signer") {
       await stopChild(oldSigner?.child);
-      if (oldSigner?.socketPath) {
-        await rm(oldSigner.socketPath, { force: true });
+      if (oldSigner?.socketDirectory) {
+        await rm(oldSigner.socketDirectory, {
+          force: true,
+          recursive: true,
+        });
       }
       oldSigner = undefined;
       return { stopped: true };
@@ -4193,7 +4210,14 @@ async function startRealSandboxControl({ installations }) {
       return result;
     },
     async close() {
-      await stopChild(oldSigner?.child).catch(() => {});
+      const signer = oldSigner;
+      await stopChild(signer?.child).catch(() => {});
+      if (signer?.socketDirectory) {
+        await rm(signer.socketDirectory, {
+          force: true,
+          recursive: true,
+        });
+      }
       oldSigner = undefined;
       await new Promise((resolvePromise) =>
         server.close(() => resolvePromise()),
@@ -5126,7 +5150,7 @@ async function scrubRuntimeSecrets() {
     temporaryRoot && join(temporaryRoot, "api-key-control.sock"),
     temporaryRoot && join(temporaryRoot, "api-key-control-fixtures"),
     realSandboxCredentialsPath,
-    oldSigner?.socketPath,
+    oldSigner?.socketDirectory,
   ].filter(Boolean);
   await Promise.all([
     scrubPlaywrightArtifacts(),

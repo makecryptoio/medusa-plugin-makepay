@@ -150,7 +150,117 @@ async function connectOauthInstallation({
   return { installation, registrationId, tokens: await tokenResponse.json() };
 }
 
+function refreshSmokeService({ afterThumbprint = "thumbprint_stable" } = {}) {
+  const runId = "medusa-e2e-refresh-helper-0123456789abcdef";
+  const paymentLinkUid = "refresh_helper_link";
+  const context = {
+    companyId: "company_refresh_helper",
+    grantId: "grant_refresh_helper",
+    installationId: "installation_refresh_helper",
+    webhookSubscriptionId: "subscription_refresh_helper",
+  };
+  const webhookUrl = "https://merchant.example/makepay/webhook";
+  let connection = {
+    access_token_expires_at: new Date(Date.now() + 10 * 60_000),
+    auth_mode: "oauth",
+    client_id: context.installationId,
+    company_id: context.companyId,
+    connected_at: new Date().toISOString(),
+    encrypted_access_token: "access_envelope_before",
+    encrypted_dpop_private_key: "dpop_envelope_before",
+    encrypted_refresh_token: "refresh_envelope_before",
+    encrypted_webhook_secret: "webhook_envelope",
+    grant_id: context.grantId,
+    id: "connection_refresh_helper",
+    installation_id: context.installationId,
+    last_error: null,
+    metadata: { dpop_thumbprint: "thumbprint_stable" },
+    provider_id: "makepay",
+    status: "connected",
+    webhook_status: "healthy",
+    webhook_subscription_id: context.webhookSubscriptionId,
+    webhook_url: webhookUrl,
+  };
+  const snapshot = () => ({
+    ...connection,
+    metadata: { ...connection.metadata },
+  });
+  const service = {
+    authMode: "oauth",
+    providerId: "makepay",
+    createClient: async () => ({
+      getCurrentWebhookSubscription: async () => {
+        connection = {
+          ...connection,
+          access_token_expires_at: new Date(Date.now() + 10 * 60_000),
+          encrypted_access_token: "access_envelope_after",
+          // AES-256-GCM rewraps the same DPoP key with a fresh nonce.
+          encrypted_dpop_private_key: "dpop_envelope_after",
+          encrypted_refresh_token: "refresh_envelope_after",
+          metadata: { dpop_thumbprint: afterThumbprint },
+        };
+        return {
+          companyId: context.companyId,
+          subscription: {
+            id: context.webhookSubscriptionId,
+            url: webhookUrl,
+          },
+        };
+      },
+    }),
+    getInstallationContext: async () => context,
+    listMakePayConnections: async () => [snapshot()],
+    projectionByUid: async (uid) => ({
+      auth_mode: "oauth",
+      company_id: context.companyId,
+      customer_email: `makepay-real-sandbox+${runId}@example.com`,
+      grant_id: context.grantId,
+      installation_id: context.installationId,
+      payment_link_uid: uid,
+      provider_id: "makepay",
+      session_id: "session_refresh_helper",
+      webhook_subscription_id: context.webhookSubscriptionId,
+    }),
+    updateMakePayConnections: async (update) => {
+      assert.equal(update.id, connection.id);
+      connection = {
+        ...connection,
+        access_token_expires_at: update.access_token_expires_at,
+      };
+    },
+  };
+  return {
+    request: { paymentLinkUid, runId },
+    service,
+  };
+}
+
 async function main() {
+  const stableRefresh = refreshSmokeService();
+  const stableRefreshResult =
+    await realSandboxHelperTest.forceOAuthRefreshReadSmoke(
+      stableRefresh.service,
+      stableRefresh.request,
+    );
+  assert.equal(stableRefreshResult.dpopCredentialStable, true);
+  assert.equal(stableRefreshResult.authenticatedReadCompleted, true);
+
+  const changedThumbprintRefresh = refreshSmokeService({
+    afterThumbprint: "thumbprint_changed",
+  });
+  await assert.rejects(
+    () =>
+      realSandboxHelperTest.forceOAuthRefreshReadSmoke(
+        changedThumbprintRefresh.service,
+        changedThumbprintRefresh.request,
+      ),
+    (error) => {
+      assert.match(String(error?.message), /dpopCredentialStable/);
+      assert.doesNotMatch(String(error?.message), /dpop_envelope/);
+      return true;
+    },
+  );
+
   const cleanupRunId = "medusa-e2e-2026-07-19T00-00-00-000Z-0123456789abcdef";
   const cleanupEmails = realSandboxHelperTest.runOwnedEmails(cleanupRunId);
   assert.equal(

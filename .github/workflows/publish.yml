@@ -104,7 +104,7 @@ jobs:
           echo "sha256=$(node -p "require('./release-candidate/candidate.json').sha256")" \
             >> "${GITHUB_OUTPUT}"
 
-      - name: Require accepted real-sandbox screenshot evidence
+      - name: Require accepted release screenshot evidence
         shell: bash
         env:
           EVIDENCE_BACKEND_ORIGIN: ${{ vars.MAKEPAY_EVIDENCE_BACKEND_ORIGIN }}
@@ -117,6 +117,11 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           sdk_version="$(node -p "require('./package.json').dependencies['@makecrypto/makepay']")"
           manifest=".github/assets/v${version}/manifest.json"
+          campaign=""
+          if [[ "${version}" == "1.0.0" ]]; then
+            campaign=".github/assets/v${version}/release-campaign.json"
+            test -f "${campaign}"
+          fi
           published_root=".github/assets/v${version}/makecrypto/public"
           test -f "${manifest}"
           test -d "${published_root}"
@@ -134,6 +139,7 @@ jobs:
           SDK_PACK_JSON="${RUNNER_TEMP}/makepay-sdk-pack.json" \
           SDK_DIRECTORY="${RUNNER_TEMP}/makepay-sdk-evidence" \
           MANIFEST="${manifest}" \
+          CAMPAIGN="${campaign}" \
           PUBLISHED_ROOT="${published_root}" \
           BACKEND_ORIGIN="${EVIDENCE_BACKEND_ORIGIN}" \
           CHECKOUT_ORIGIN="${EVIDENCE_CHECKOUT_ORIGIN}" \
@@ -151,9 +157,7 @@ jobs:
             throw new Error("SDK registry pack did not return an immutable artifact")
           }
           const sdkBytes = readFileSync(join(process.env.SDK_DIRECTORY, sdk.filename))
-          const result = spawnSync(
-            process.execPath,
-            [
+          const args = [
               "tests/e2e/screenshot-gate.mjs",
               "--manifest",
               process.env.MANIFEST,
@@ -173,7 +177,13 @@ jobs:
               sdk.version,
               "--check",
               "release",
-            ],
+            ]
+          if (process.env.CAMPAIGN) {
+            args.push("--campaign", process.env.CAMPAIGN)
+          }
+          const result = spawnSync(
+            process.execPath,
+            args,
             { encoding: "utf8", stdio: ["ignore", "inherit", "inherit"] },
           )
           if (result.status !== 0) {
@@ -181,8 +191,12 @@ jobs:
           }
           NODE
 
+          documentation_args=(--manifest "${manifest}")
+          if [[ -n "${campaign}" ]]; then
+            documentation_args+=(--campaign "${campaign}")
+          fi
           node tests/e2e/official-documentation-gate.mjs \
-            --manifest "${manifest}"
+            "${documentation_args[@]}"
 
       - name: Upload immutable npm candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -305,8 +319,15 @@ jobs:
         run: |
           set -euo pipefail
           version="$(node -p "require('./release-candidate/candidate.json').version")"
+          campaign_args=()
+          if [[ "${version}" == "1.0.0" ]]; then
+            campaign=".github/assets/v${version}/release-campaign.json"
+            test -f "${campaign}"
+            campaign_args=(--campaign "${campaign}")
+          fi
           node tests/e2e/official-documentation-gate.mjs \
-            --manifest ".github/assets/v${version}/manifest.json"
+            --manifest ".github/assets/v${version}/manifest.json" \
+            "${campaign_args[@]}"
 
       - name: Publish candidate with npm trusted publishing
         run: |

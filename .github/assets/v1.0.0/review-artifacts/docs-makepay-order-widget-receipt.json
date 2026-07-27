@@ -1,0 +1,26 @@
+{
+  "caption": "Medusa order details showing the MakePay payment widget and read-only reconciliation controls.",
+  "currentSrcPath": "/images/documentation/apps/medusa/makepay-order-widget.png",
+  "documentContentType": "text/html",
+  "documentOrigin": "http://127.0.0.1:3022",
+  "docsSourceSha256": "6cd2ecc94082f46dafe9a6dce2935b114b4bb7b021aff2e17722521a65dd4264",
+  "documentPath": "/documentation/makepay/apps/medusa",
+  "documentRedirected": false,
+  "documentResponseSha256": "ffe1d17cadc2c9f70993e8caf793ceea425b7064b25e26683d0c54fb4e2930ac",
+  "documentStatus": 200,
+  "manifestEvidenceDigest": "a644e5c9fbfb1bfb4aeec33a325fd0c733b612267debfce10991db934d40da8d",
+  "manifestRunId": "medusa-e2e-2026-07-27T08-59-45-191Z-184868869b5e3f12",
+  "publicPath": "/images/documentation/apps/medusa/makepay-order-widget.png",
+  "renderedDocument": "review-artifacts/docs-makepay-order-widget.png",
+  "renderedSha256": "514ecf27f8ca99a4605d37afab87fa51d17e9501ffad15c35ec1bbb8438c7961",
+  "responseContentType": "image/png",
+  "responseSha256": "ad855dbe9cf159d0d7399700fa806cafd88bec1246f8ee5550232f862bf8e753",
+  "responseStatus": 200,
+  "schemaVersion": 2,
+  "sourceFilename": "makepay-order-widget.png",
+  "sourceSha256": "ad855dbe9cf159d0d7399700fa806cafd88bec1246f8ee5550232f862bf8e753",
+  "viewport": {
+    "width": 1440,
+    "height": 960
+  }
+}

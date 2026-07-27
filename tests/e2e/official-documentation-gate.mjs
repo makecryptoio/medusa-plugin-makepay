@@ -4,6 +4,10 @@ import { resolve } from "node:path";
 
 import { chromium } from "playwright";
 
+import {
+  loadReleaseEvidenceCampaign,
+} from "./support/release-evidence-campaign.mjs";
+
 const officialOrigin = "https://www.makecrypto.io";
 const documentationPath = "/documentation/makepay/apps/medusa";
 const evidence = [
@@ -41,22 +45,36 @@ function publicPath(filename) {
   return `/images/documentation/apps/medusa/${filename}`;
 }
 
-function parseManifestArgument(argv) {
-  if (
-    argv.length !== 2 ||
-    argv[0] !== "--manifest" ||
-    !argv[1] ||
-    argv[1].startsWith("--")
-  ) {
+function parseArguments(argv) {
+  const result = {};
+  const allowed = new Set(["campaign", "manifest"]);
+  for (let index = 0; index < argv.length; index += 2) {
+    const argument = argv[index];
+    const value = argv[index + 1];
+    if (
+      !argument?.startsWith("--") ||
+      !allowed.has(argument.slice(2)) ||
+      !value ||
+      value.startsWith("--") ||
+      Object.hasOwn(result, argument.slice(2))
+    ) {
+      fail(
+        "Usage: node official-documentation-gate.mjs --manifest .github/assets/vX.Y.Z/manifest.json [--campaign .github/assets/v1.0.0/release-campaign.json]",
+      );
+    }
+    result[argument.slice(2)] = resolve(value);
+  }
+  if (!result.manifest) {
     fail(
-      "Usage: node official-documentation-gate.mjs --manifest .github/assets/vX.Y.Z/manifest.json",
+      "Usage: node official-documentation-gate.mjs --manifest .github/assets/vX.Y.Z/manifest.json [--campaign .github/assets/v1.0.0/release-campaign.json]",
     );
   }
-  return resolve(argv[1]);
+  return result;
 }
 
 async function main() {
-  const manifestPath = parseManifestArgument(process.argv.slice(2));
+  const args = parseArguments(process.argv.slice(2));
+  const manifestPath = args.manifest;
   const manifestEntry = await lstat(manifestPath);
   if (
     manifestEntry.isSymbolicLink() ||
@@ -68,6 +86,12 @@ async function main() {
     fail("Official documentation rendering requires a trusted manifest file");
   }
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  const completionBinding = args.campaign
+    ? await loadReleaseEvidenceCampaign({
+        campaignPath: args.campaign,
+        manifestPath,
+      })
+    : manifest.completionAttestation;
   const manifestEvidence = Array.isArray(manifest.evidence)
     ? manifest.evidence
     : [];
@@ -77,7 +101,7 @@ async function main() {
   if (
     manifest.schemaVersion !== 3 ||
     manifest.mode !== "real-sandbox" ||
-    manifest.completionAttestation?.status !== "accepted" ||
+    completionBinding?.status !== "accepted" ||
     manifestEvidence.length !== evidence.length ||
     new Set(manifestEvidence.map((entry) => entry.filename)).size !==
       evidence.length ||

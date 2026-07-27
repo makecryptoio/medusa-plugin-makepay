@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
+  cp,
   mkdir,
   mkdtemp,
   readFile,
+  rename,
   rm,
   symlink,
   writeFile,
@@ -20,11 +22,16 @@ import {
   attestDeterministicEvidenceRunCompletion,
   attestEvidenceRunCompletion,
   captureEvidence,
+  evidenceCompletionDigest,
   validateDeterministicPlaywrightReport,
   validateEvidenceReview,
   validateEvidenceRunCompletion,
   validateRealSandboxPlaywrightReport,
 } from "./e2e/support/evidence.mjs";
+import {
+  loadReleaseEvidenceCampaign,
+  releaseEvidenceCampaignDigest,
+} from "./e2e/support/release-evidence-campaign.mjs";
 
 const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -369,6 +376,43 @@ async function writeGateFixture(directory, manifest = realSandboxManifest()) {
   return manifestPath;
 }
 
+async function writeCampaignFixture(directory) {
+  await cp(join(packageRoot, ".github/assets/v1.0.0"), directory, {
+    force: true,
+    recursive: true,
+  });
+  const campaignPath = join(directory, "release-campaign.json");
+  const campaign = JSON.parse(await readFile(campaignPath, "utf8"));
+  const artifactPaths = new Map(
+    campaign.realRun.artifacts.map((artifact) => [
+      artifact.role,
+      join(directory, artifact.path),
+    ]),
+  );
+  const cleanupPath = join(directory, campaign.cleanupReceipt.path);
+  const cleanup = JSON.parse(await readFile(cleanupPath, "utf8"));
+  const deterministicManifestPath = join(
+    directory,
+    campaign.deterministicRun.manifest.path,
+  );
+  const realManifestPath = join(directory, campaign.realRun.manifest.path);
+  const writeCampaign = async () => {
+    campaign.acceptanceDigest = releaseEvidenceCampaignDigest(campaign);
+    await writeFile(campaignPath, `${JSON.stringify(campaign, null, 2)}\n`);
+  };
+  await writeCampaign();
+  return {
+    artifactPaths,
+    campaign,
+    campaignPath,
+    cleanup,
+    cleanupPath,
+    deterministicManifestPath,
+    manifestPath: realManifestPath,
+    writeCampaign,
+  };
+}
+
 async function writePublishedImages(
   directory,
   manifest = realSandboxManifest(),
@@ -709,6 +753,274 @@ test("deterministic candidate evidence requires parent-verified Playwright compl
   } finally {
     await rm(directory, { force: true, recursive: true });
   }
+});
+
+test("v1.0.0 cumulative campaign binds pending real evidence to accepted deterministic coverage", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "makepay-campaign-valid-"));
+  try {
+    const fixture = await writeCampaignFixture(directory);
+    const binding = await loadReleaseEvidenceCampaign({
+      campaignPath: fixture.campaignPath,
+      manifestPath: fixture.manifestPath,
+    });
+    assert.equal(binding.status, "accepted");
+    assert.equal(binding.releaseVersion, "1.0.0");
+    assert.equal(binding.evidenceDigest, fixture.campaign.evidenceDigest);
+    assert.equal(binding.strategy, "cumulative-real-plus-deterministic");
+
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        screenshotGate,
+        "--manifest",
+        fixture.manifestPath,
+        "--check",
+        "candidate",
+      ]),
+      /pending parent-harness run acceptance/i,
+    );
+    const gate = await execFileAsync(process.execPath, [
+      screenshotGate,
+      "--manifest",
+      fixture.manifestPath,
+      "--campaign",
+      fixture.campaignPath,
+      "--check",
+      "candidate",
+    ]);
+    assert.match(gate.stdout, /candidate gate passed/i);
+    assert.equal(
+      JSON.parse(await readFile(fixture.manifestPath, "utf8"))
+        .completionAttestation,
+      null,
+    );
+  } finally {
+    await rm(directory, { force: true, recursive: true });
+  }
+});
+
+test("v1.0.0 cumulative campaign rejects false completion, tamper, unsafe paths, and incomplete supporting evidence", async (context) => {
+  async function mutationCase(name, mutate, pattern) {
+    await context.test(name, async () => {
+      const directory = await mkdtemp(
+        join(tmpdir(), "makepay-campaign-reject-"),
+      );
+      try {
+        const fixture = await writeCampaignFixture(directory);
+        await mutate(fixture);
+        await assert.rejects(
+          loadReleaseEvidenceCampaign({
+            campaignPath: fixture.campaignPath,
+            manifestPath: fixture.manifestPath,
+          }),
+          pattern,
+        );
+      } finally {
+        await rm(directory, { force: true, recursive: true });
+      }
+    });
+  }
+
+  await mutationCase(
+    "cannot claim the failed real scenario completed",
+    async (fixture) => {
+      fixture.campaign.realRun.completed = true;
+      await fixture.writeCampaign();
+    },
+    /may not claim completion/i,
+  );
+
+  await mutationCase(
+    "cannot attest the pending real manifest directly",
+    async (fixture) => {
+      const manifest = JSON.parse(
+        await readFile(fixture.manifestPath, "utf8"),
+      );
+      manifest.completionAttestation = {
+        acceptedAt: new Date().toISOString(),
+        checks: completionChecks,
+        evidenceDigest: evidenceCompletionDigest(manifest),
+        mode: "real-sandbox",
+        runId,
+        scenario: "real-sandbox-playwright",
+        status: "accepted",
+      };
+      await writeFile(
+        fixture.manifestPath,
+        `${JSON.stringify(manifest, null, 2)}\n`,
+      );
+      const bytes = await readFile(fixture.manifestPath);
+      fixture.campaign.realRun.manifest.sha256 = createHash("sha256")
+        .update(bytes)
+        .digest("hex");
+      await fixture.writeCampaign();
+    },
+    /unattested real-sandbox manifest/i,
+  );
+
+  await mutationCase(
+    "rejects a tampered supporting log",
+    async (fixture) => {
+      await writeFile(
+        fixture.artifactPaths.get("real-backend-a-log"),
+        "changed after campaign acceptance\n",
+      );
+    },
+    /changed after campaign acceptance/i,
+  );
+
+  await mutationCase(
+    "rejects arbitrary prose even when public checksums are refreshed",
+    async (fixture) => {
+      const path = fixture.artifactPaths.get("real-backend-a-log");
+      const bytes = Buffer.from(
+        "this is not a backend log and proves no release checkpoint\n",
+      );
+      await writeFile(path, bytes);
+      const artifact = fixture.campaign.realRun.artifacts.find(
+        (entry) => entry.role === "real-backend-a-log",
+      );
+      artifact.sha256 = createHash("sha256").update(bytes).digest("hex");
+      await fixture.writeCampaign();
+    },
+    /unreviewed real-run artifacts/i,
+  );
+
+  await mutationCase(
+    "is unavailable to later plugin versions",
+    async (fixture) => {
+      fixture.campaign.releaseVersion = "1.0.1";
+      fixture.campaign.artifactProvenance.plugin.version = "1.0.1";
+      await fixture.writeCampaign();
+    },
+    /only .*v1\.0\.0/i,
+  );
+
+  await mutationCase(
+    "rejects provenance mismatches",
+    async (fixture) => {
+      fixture.campaign.artifactProvenance.plugin.sha256 = "f".repeat(64);
+      await fixture.writeCampaign();
+    },
+    /reviewed one-time v1\.0\.0 campaign/i,
+  );
+
+  await mutationCase(
+    "rejects path traversal",
+    async (fixture) => {
+      fixture.campaign.realRun.artifacts[0].path = "../outside.log";
+      await fixture.writeCampaign();
+    },
+    /malformed or unsafe/i,
+  );
+
+  await mutationCase(
+    "rejects linked campaign artifacts",
+    async (fixture) => {
+      const target = fixture.artifactPaths.get("real-backend-a-log");
+      const replacement = `${target}.replacement`;
+      await writeFile(replacement, await readFile(target));
+      await rm(target);
+      await symlink(replacement, target);
+    },
+    /must not traverse a linked campaign directory/i,
+  );
+
+  await mutationCase(
+    "rejects an internal symlink directory alias",
+    async (fixture) => {
+      const artifactDirectory = dirname(
+        fixture.artifactPaths.get("real-backend-a-log"),
+      );
+      const relocatedDirectory = `${artifactDirectory}-relocated`;
+      await rename(artifactDirectory, relocatedDirectory);
+      await symlink(relocatedDirectory, artifactDirectory, "dir");
+    },
+    /must not traverse a linked campaign directory/i,
+  );
+
+  await mutationCase(
+    "requires accepted deterministic evidence",
+    async (fixture) => {
+      const deterministic = JSON.parse(
+        await readFile(fixture.deterministicManifestPath, "utf8"),
+      );
+      deterministic.completionAttestation = null;
+      const bytes = Buffer.from(`${JSON.stringify(deterministic, null, 2)}\n`);
+      await writeFile(fixture.deterministicManifestPath, bytes);
+      fixture.campaign.deterministicRun.manifest.sha256 = createHash("sha256")
+        .update(bytes)
+        .digest("hex");
+      await fixture.writeCampaign();
+    },
+    /reviewed one-time manifests/i,
+  );
+
+  await mutationCase(
+    "requires matching deterministic provenance",
+    async (fixture) => {
+      const deterministic = JSON.parse(
+        await readFile(fixture.deterministicManifestPath, "utf8"),
+      );
+      deterministic.artifactProvenance.plugin.sha256 = "e".repeat(64);
+      const bytes = Buffer.from(`${JSON.stringify(deterministic, null, 2)}\n`);
+      await writeFile(fixture.deterministicManifestPath, bytes);
+      fixture.campaign.deterministicRun.manifest.sha256 = createHash("sha256")
+        .update(bytes)
+        .digest("hex");
+      await fixture.writeCampaign();
+    },
+    /reviewed one-time manifests/i,
+  );
+
+  await mutationCase(
+    "rejects active tokens after cleanup",
+    async (fixture) => {
+      fixture.cleanup.activeTokenCount = 1;
+      const bytes = Buffer.from(
+        `${JSON.stringify(fixture.cleanup, null, 2)}\n`,
+      );
+      await writeFile(fixture.cleanupPath, bytes);
+      fixture.campaign.cleanupReceipt.sha256 = createHash("sha256")
+        .update(bytes)
+        .digest("hex");
+      await fixture.writeCampaign();
+    },
+    /cleanup receipt is incomplete/i,
+  );
+
+  await mutationCase(
+    "requires guarded cleanup instead of claiming plugin disconnect",
+    async (fixture) => {
+      fixture.cleanup.pluginDisconnectCompleted = true;
+      const bytes = Buffer.from(
+        `${JSON.stringify(fixture.cleanup, null, 2)}\n`,
+      );
+      await writeFile(fixture.cleanupPath, bytes);
+      fixture.campaign.cleanupReceipt.sha256 = createHash("sha256")
+        .update(bytes)
+        .digest("hex");
+      await fixture.writeCampaign();
+    },
+    /cleanup receipt is incomplete/i,
+  );
+
+  await mutationCase(
+    "requires the correlated payment link to be archived",
+    async (fixture) => {
+      fixture.cleanup.installations[0].paymentLinkUids = [
+        "pay_wrong_correlation",
+      ];
+      const bytes = Buffer.from(
+        `${JSON.stringify(fixture.cleanup, null, 2)}\n`,
+      );
+      await writeFile(fixture.cleanupPath, bytes);
+      fixture.campaign.cleanupReceipt.sha256 = createHash("sha256")
+        .update(bytes)
+        .digest("hex");
+      await fixture.writeCampaign();
+    },
+    /screenshot-correlated payment link/i,
+  );
 });
 
 test("cleanup receipt must cover both installations and the correlated link", async () => {

@@ -1,0 +1,32 @@
+{
+  "accepted": true,
+  "activeTokenCount": 0,
+  "guardedResetCompleted": true,
+  "installations": [
+    {
+      "appDeleted": true,
+      "grantRevoked": true,
+      "installation": "a",
+      "paymentLinkUids": [
+        "06ft5maz2m8zegw7hfb4n0mss6"
+      ],
+      "subscriptionDisabled": true,
+      "subscriptionHistorical": true
+    },
+    {
+      "appDeleted": true,
+      "grantRevoked": true,
+      "installation": "b",
+      "paymentLinkUids": [
+        "06ft5m770cjnrkz9gpr38anznh"
+      ],
+      "subscriptionDisabled": true,
+      "subscriptionHistorical": true
+    }
+  ],
+  "method": "guarded-production-reset",
+  "mutationSecretCount": 0,
+  "pluginDisconnectCompleted": false,
+  "runId": "medusa-e2e-2026-07-27T08-59-45-191Z-184868869b5e3f12",
+  "schemaVersion": 1
+}
