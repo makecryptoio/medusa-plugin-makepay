@@ -210,7 +210,7 @@ export function validateMakePayProviderOptions(
 
   if (getText(options.providerId) && options.providerId !== "makepay") {
     throw new Error(
-      "MakePay 1.0.0 supports only providerId `makepay` (pp_makepay_makepay).",
+      "MakePay 1.0.x supports only providerId `makepay` (pp_makepay_makepay).",
     );
   }
 

@@ -3,6 +3,14 @@
 All notable changes to this package are documented here. The project follows
 [Semantic Versioning](https://semver.org/).
 
+## [1.0.1] - 2026-07-27
+
+### Documentation
+
+- Clarified that installation requires a fully configured, active
+  [MakePay merchant account](https://makepay.io/) rather than linking the
+  prerequisite to the MakeCrypto corporate site.
+
 ## [1.0.0] - 2026-07-25
 
 `1.0.0` is the first stable release and intentionally follows the previously
@@ -87,5 +95,6 @@ published `0.2.0`. No intervening package versions were published.
 - Added the initial Medusa v2 hosted-checkout payment provider with API-key
   authentication and signed webhook handling.
 
+[1.0.1]: https://www.npmjs.com/package/@makecrypto/medusa-plugin-makepay/v/1.0.1
 [1.0.0]: https://github.com/makepay-apps/medusa-plugin-makepay/compare/v0.2.0...v1.0.0
 [0.2.0]: https://github.com/makepay-apps/medusa-plugin-makepay/releases/tag/v0.2.0

@@ -107,7 +107,7 @@ export MAKEPAY_E2E_REAL_CHECKOUT_URL=https://your-approved-makepay-checkout.exam
 export MAKEPAY_E2E_REAL_OAUTH_ISSUER_URL=https://your-approved-oauth-issuer.example
 export MAKEPAY_E2E_SANDBOX_COMPANY_ID=company_sandbox_id
 export MAKEPAY_E2E_SANDBOX_COMPANY_NAME='Sandbox Merchant Name'
-export MAKEPAY_PLUGIN_TARBALL=/absolute/path/to/makecrypto-medusa-plugin-makepay-1.0.0.tgz
+export MAKEPAY_PLUGIN_TARBALL=/absolute/path/to/makecrypto-medusa-plugin-makepay-1.0.1.tgz
 export MAKEPAY_PLUGIN_TARBALL_SHA256=64_lowercase_hex_plugin_sha256
 export MAKEPAY_SDK_TARBALL=/absolute/path/to/makecrypto-makepay-0.4.0.tgz
 export MAKEPAY_SDK_TARBALL_SHA256=64_lowercase_hex_sdk_sha256
@@ -235,7 +235,7 @@ node tests/e2e/screenshot-gate.mjs \
   --backend-origin https://the-exact-backend-tunnel.example \
   --checkout-origin https://the-approved-makepay-sandbox.example \
   --plugin-sha256 "$PLUGIN_SHA256" \
-  --plugin-version 1.0.0 \
+  --plugin-version 1.0.1 \
   --sdk-sha256 "$SDK_SHA256" \
   --sdk-version 0.4.0 \
   --check release

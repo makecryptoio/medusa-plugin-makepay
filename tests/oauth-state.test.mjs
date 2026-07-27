@@ -541,7 +541,7 @@ test("OAuth start creates a ten-minute, hashed, encrypted PKCE transaction", asy
   assert.equal(registration.body.platform, "medusa");
   assert.match(registration.body.registrationId, /^[A-Za-z0-9_-]{43}$/);
   assert.match(registration.body.dpopJkt, /^[A-Za-z0-9_-]{43}$/);
-  assert.equal(registration.body.pluginVersion, "1.0.0");
+  assert.equal(registration.body.pluginVersion, "1.0.1");
   assert.equal(registration.body.siteUrl, "https://api.shop.test");
   assert.equal(
     registration.body.redirectUri,

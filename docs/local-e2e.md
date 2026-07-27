@@ -29,7 +29,7 @@ Install the resulting `.tgz` in a clean Medusa 2.17.2 backend. Do not use an
 will publish.
 
 ```bash
-npm install --save-exact /absolute/path/to/makecrypto-medusa-plugin-makepay-1.0.0.tgz
+npm install --save-exact /absolute/path/to/makecrypto-medusa-plugin-makepay-1.0.1.tgz
 ```
 
 Create a fresh database, configure the plugin as shown in the README, including
@@ -180,7 +180,7 @@ export MAKEPAY_E2E_REAL_CHECKOUT_URL=https://approved-makepay-checkout.example
 export MAKEPAY_E2E_REAL_OAUTH_ISSUER_URL=https://approved-oauth-issuer.example
 export MAKEPAY_E2E_SANDBOX_COMPANY_ID=company_sandbox_id
 export MAKEPAY_E2E_SANDBOX_COMPANY_NAME='Publication-safe Sandbox Merchant'
-export MAKEPAY_PLUGIN_TARBALL=/absolute/path/to/makecrypto-medusa-plugin-makepay-1.0.0.tgz
+export MAKEPAY_PLUGIN_TARBALL=/absolute/path/to/makecrypto-medusa-plugin-makepay-1.0.1.tgz
 export MAKEPAY_PLUGIN_TARBALL_SHA256=64_lowercase_hex_plugin_sha256
 export MAKEPAY_SDK_TARBALL=/absolute/path/to/makecrypto-makepay-0.4.0.tgz
 export MAKEPAY_SDK_TARBALL_SHA256=64_lowercase_hex_sdk_sha256
@@ -310,7 +310,7 @@ node tests/e2e/screenshot-gate.mjs \
   --backend-origin https://the-exact-backend-tunnel.example \
   --checkout-origin https://the-approved-makepay-sandbox.example \
   --plugin-sha256 "$PLUGIN_SHA256" \
-  --plugin-version 1.0.0 \
+  --plugin-version 1.0.1 \
   --sdk-sha256 "$SDK_SHA256" \
   --sdk-version 0.4.0 \
   --check release

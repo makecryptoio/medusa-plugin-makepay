@@ -11,7 +11,7 @@ Official MakePay hosted cryptocurrency payments for Medusa v2. One package
 contains the payment provider, MakeCrypto OAuth connection, database module,
 API routes, and Medusa Admin pages/widgets—there is no separate Admin package.
 
-Version 1.0.0 supports:
+Version 1.0.1 supports:
 
 - MakeCrypto OAuth with PKCE, DPoP-bound tokens, automatic refresh, and a
   grant-scoped webhook subscription.
@@ -43,7 +43,7 @@ synthetic customer data. No cryptocurrency is sent.
 - Medusa 2.17.2 or newer within the 2.x release line
 - PostgreSQL, as required by Medusa
 - Medusa's Locking Module enabled (OAuth token rotation fails closed without it)
-- A [MakeCrypto](https://makecrypto.io) company with MakePay enabled
+- A [MakePay](https://makepay.io/) merchant account fully set and active
 - A public HTTPS Medusa backend URL for production OAuth and webhooks
 
 Upgrading from 0.2.0? Read [MIGRATING.md](./MIGRATING.md) before installing.
@@ -51,7 +51,7 @@ Upgrading from 0.2.0? Read [MIGRATING.md](./MIGRATING.md) before installing.
 ## Install
 
 ```bash
-npm install --save-exact @makecrypto/medusa-plugin-makepay@1.0.0
+npm install --save-exact @makecrypto/medusa-plugin-makepay@1.0.1
 ```
 
 The package must be registered twice in `medusa-config.ts`: as a plugin so
@@ -271,13 +271,13 @@ session existed and Medusa records it canceled. If a switch was forced,
 restore OAuth to process a redelivery before creating a fresh API-key payment
 attempt.
 
-Version 1.0.0 supports the exact provider configuration ID `makepay` only.
+Versions 1.0.x support the exact provider configuration ID `makepay` only.
 Keep `providers[].id` as `makepay` and omit `makePayOptions.providerId` (or set
 it to the same value), producing `pp_makepay_makepay`. Custom or multiple
 MakePay provider IDs are rejected because one plugin registration owns one
 connection and webhook identity.
 
-Version 1.0.0 preserves this URL but intercepts MakePay callbacks before
+Versions 1.0.x preserve this URL but intercept MakePay callbacks before
 Medusa's generic payment-webhook handler. It verifies the signature, fetches
 and correlates the hosted link, serializes the payment effects, and runs the
 required Medusa workflow synchronously. The route returns `2xx` only after the
@@ -307,7 +307,7 @@ reconciliation.
 | `oauthIssuerUrl`                        | OAuth          | MakeCrypto OAuth issuer override for contract/local testing.                                                                                                         |
 | `oauthApiUrl`                           | OAuth          | MakeCrypto OAuth/API origin override for contract/local testing.                                                                                                     |
 | `oauthAudience`                         | OAuth          | OAuth resource audience override; normally leave unset. The official resource ID defaults to `https://makecrypto.io/api/partner/v1`.                                 |
-| `providerId`                            | both           | Reserved compatibility option; omit it or set the only supported 1.0.0 value, `makepay`.                                                                             |
+| `providerId`                            | both           | Reserved compatibility option; omit it or set the only supported 1.0.x value, `makepay`.                                                                             |
 | `adminPath`                             | both/Admin     | Medusa Admin base path used for OAuth callback redirects and order links. Default: `/app`; use the configured Admin path if customized.                              |
 | `siteName`, `medusaVersion`             | OAuth          | Non-brand installation and version metadata used for support and Connected Apps presentation; official MakePay branding is template-controlled.                      |
 | `webhookToleranceSeconds`               | both           | Maximum signed-webhook timestamp age.                                                                                                                                |

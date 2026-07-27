@@ -1277,7 +1277,7 @@ export default class MakePayModuleService extends MedusaService({
       dpopJkt: keyPair.thumbprint,
       medusaVersion: getText(this.options_.medusaVersion) ?? "2.17.2+",
       platform: "medusa",
-      pluginVersion: "1.0.0",
+      pluginVersion: "1.0.1",
       registrationId,
       redirectUri: config.callbackUrl,
       siteUrl: new URL(config.backendUrl).origin,
